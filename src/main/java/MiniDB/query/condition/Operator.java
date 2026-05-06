@@ -1,0 +1,5 @@
+package MiniDB.query.condition;
+
+public enum Operator {
+    GREATERTHAN,LESSERTHAN,EQUALTO,GREATEREQUALTO,LESSEREQUALTO,NOT_EQUALTO;
+}
