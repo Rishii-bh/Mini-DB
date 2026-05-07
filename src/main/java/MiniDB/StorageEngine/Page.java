@@ -1,4 +1,126 @@
 package MiniDB.StorageEngine;
 
 public class Page {
+    public static final int PAGE_SIZE = 4096;
+    private static final int SLOT_COUNT_OFFSET = 0;
+    private static final int FREE_SPACE_END_OFFSET= 2;
+    private static final int HEADER_SIZE=16;
+    private static final int SLOT_SIZE =4;
+    private final byte[] data;
+//This Page basically acts as a wrapper for 4096 bytes. Header space is 16Bytes reserved and the rest is free
+    //Slot data starts from where header ends and row data starts from the end
+    //so both sorta meet at the middle. The byte array is the source of truth everything is read from there
+    //slot access is O(1) since slot_size is fixed
+    //each slot stores the data of the row offset and its length so row access also becomes O(1)
+    public Page(byte[] data) {
+        if (data == null) {
+            throw new StorageException("Page data cannot be null");
+        }
+
+        if (data.length != PAGE_SIZE) {
+            throw new StorageException("Page must be exactly " + PAGE_SIZE + " bytes");
+        }
+
+        this.data = data;
+    }
+    public static Page createEmptyPage() {
+        byte[] data = new byte[PAGE_SIZE];
+        Page page = new Page(data);
+        page.setSlotCount(0);
+        page.setFreeSpaceEnd(PAGE_SIZE);
+        return page;
+    }
+
+    public static Page wrap(byte[] data) {
+        return new Page(data);
+    }
+
+    public byte[] getData() {
+        return data;
+    }
+
+    public int getSlotCount() {
+        return readShort(SLOT_COUNT_OFFSET);
+    }
+    public void setSlotCount(int slotCount) {
+        writeShort(SLOT_COUNT_OFFSET,slotCount);
+    }
+    public void incrementSlotCount() {
+         setSlotCount(getSlotCount()+1);
+    }
+
+    public int getFreeSpaceEnd() {
+        return readShort(FREE_SPACE_END_OFFSET);
+    }
+    public void setFreeSpaceEnd(int freeSpaceEnd) {
+        writeShort(FREE_SPACE_END_OFFSET,freeSpaceEnd);
+    }
+
+    public int getFreeSpaceStart() {
+        return HEADER_SIZE + getSlotCount()*SLOT_SIZE;
+    }
+
+    public int getAvailableSpace() {
+        return getFreeSpaceEnd() - getFreeSpaceStart();
+    }
+
+    private int slotOffset(int slotId) {
+        return HEADER_SIZE + slotId * SLOT_SIZE;
+    }
+
+    public void writeSlot(int slotId, int rowOffSet, int length) {
+        int pos = slotOffset(slotId);
+        writeShort(pos, rowOffSet);
+        writeShort(pos+2, length);
+    }
+
+    public Slot readSlot(int slotId) {
+        if(slotId<0 || slotId>=getSlotCount()) {
+            throw new StorageException("Invalid slot ID!");
+        }
+        int pos = slotOffset(slotId);
+        int rowOffSet = readShort(pos);
+        int length = readShort(pos+2);
+        return new Slot(rowOffSet, length);
+    }
+
+    private int readShort(int offset) {
+        return ((data[offset] & 0xFF) << 8)
+                | (data[offset + 1] & 0xFF);
+    }
+
+    private void writeShort(int offset, int value) {
+        if (value < 0 || value > 65535) {
+            throw new IllegalArgumentException("Value does not fit in unsigned short: " + value);
+        }
+
+        data[offset] = (byte) ((value >>> 8) & 0xFF);
+        data[offset + 1] = (byte) (value & 0xFF);
+    }
+
+    public int tryInsert(byte[] rowBytes) {
+        if(rowBytes == null){
+            throw new StorageException("Row bytes cannot be null!");
+        }
+        if(rowBytes.length > getAvailableSpace()-SLOT_SIZE){
+            return -1;
+        }
+        int slotId = getSlotCount();
+        incrementSlotCount();
+        int rowOffSet = getFreeSpaceEnd()- rowBytes.length;
+        writeSlot(slotId, rowOffSet, rowBytes.length);
+        System.arraycopy(rowBytes, 0, data, rowOffSet , rowBytes.length);
+        setFreeSpaceEnd(getFreeSpaceEnd()-rowBytes.length);
+        return slotId;
+    }
+
+    public byte[] getRowBytes(int slotId) {
+        if(slotId<0 || slotId>=getSlotCount()) {
+            throw new StorageException("Invalid slot ID!");
+        }
+        Slot slot = readSlot(slotId);
+        byte[] rowBytes = new byte[slot.length()];
+        System.arraycopy(data,slot.offset(),rowBytes,0,slot.length());
+        return rowBytes;
+    }
 }
