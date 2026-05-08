@@ -83,7 +83,7 @@ Example table directory:
 data/
   students/
     schema.meta
-    rows.bin
+    tables.dat
 
 The schema is stored as text:
 
@@ -92,13 +92,9 @@ id:INT
 name:TEXT
 active:BOOL
 
-Rows are stored in binary format. Each row is written as:
-
-
-[row length][row bytes]
-
-
-This makes it possible to store variable-length values such as `TEXT`.
+table.dat stores fixed-size 4096-byte pages.
+Each page contains a header, slot directory, free space region, and row bytes.
+Rows are still serialized using BinaryRowSerializer before being inserted into pages.
 
 ---
 
@@ -127,7 +123,6 @@ MiniDB is still a learning project and does not yet support:
 - Transactions
 - Concurrency
 - Crash recovery
-- Page-based storage
 - `UPDATE`
 - `DROP TABLE`
 - `NULL`
@@ -141,14 +136,16 @@ Planned improvements:
 
 - Add tombstone-based deletion instead of rewriting the whole row file
 - Add a compaction step to clean up deleted rows
-- Move from simple binary row files to page-based storage
-- Add page headers and slot directories
 - Add support for `UPDATE`
 - Add more SQL features gradually
 
 ---
 
+### UPDATES
+Moved from Binary Storage to Page-based Storage where Slot Access is O(1) and Row access is O(1)
+
 ## Notes
 
 This project is mainly for learning database internals. The focus is on understanding the design and implementation of a database system step by step, not on building a production-ready database.
+
 
