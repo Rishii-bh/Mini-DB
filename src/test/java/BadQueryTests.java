@@ -26,44 +26,32 @@ public class BadQueryTests {
     Path tempDir;
 
     private SqlRunner newRunner() {
-        BinaryFileStorage binaryFileStorage = new BinaryFileStorage(tempDir);
-        QueryEngine queryEngine = new QueryEngine(binaryFileStorage);
+        PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
+        QueryEngine queryEngine = new QueryEngine(pageFileStorage);
         return new SqlRunner(queryEngine);
     }
 
     private List<Row> readBinaryRows(Path rowsPath, Schema schema) {
-        BinaryRowSerializer rowSerializer = new BinaryRowSerializer();
+        BinaryRowSerializer binaryRowSerializer = new BinaryRowSerializer();
+        PageFile pageFile = new PageFile(rowsPath);
         List<Row> rows = new ArrayList<>();
-
-        try (
-                InputStream fileIn = Files.newInputStream(rowsPath);
-                DataInputStream in = new DataInputStream(fileIn)
-        ) {
-            while (true) {
-                int rowLength;
-
-                try {
-                    rowLength = in.readInt();
-                } catch (EOFException eof) {
-                    break;
+        try{
+            int numOfPages = pageFile.getPageCount();
+            for (int i = 0; i < numOfPages; i++) {
+                Page page = pageFile.readPage(i);
+                int slotCount = page.getSlotCount();
+                for (int j = 0; j < slotCount; j++) {
+                    byte[] rowBytes = page.getRowBytes(j);
+                    Row row = binaryRowSerializer.deserialize(rowBytes, schema);
+                    rows.add(row);
                 }
-
-                if (rowLength < 0) {
-                    throw new AssertionError("Invalid negative row length: " + rowLength);
-                }
-
-                byte[] rowBytes = new byte[rowLength];
-                in.readFully(rowBytes);
-
-                Row row = rowSerializer.deserialize(rowBytes, schema);
-                rows.add(row);
             }
 
-            return rows;
 
-        } catch (IOException e) {
-            throw new AssertionError("Could not read binary rows file: " + rowsPath, e);
+        } catch (Exception e) {
+            throw new StorageException("Could not read Page File", e);
         }
+        return rows;
     }
 
     @Test
@@ -73,7 +61,7 @@ public class BadQueryTests {
         runner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
         runner.execute("INSERT INTO students (id, name, active) VALUES (1, \"Rishi\", true);");
 
-        Path rowsPath = tempDir.resolve("students").resolve("rows.bin");
+        Path rowsPath = tempDir.resolve("students").resolve("table.dat");
         Schema schema = new Schema(List.of(
                 new Column("id", Type.INT),
                 new Column("name", Type.TEXT),
@@ -95,7 +83,7 @@ public class BadQueryTests {
         runner.execute("CREATE TABLE students (id INT, name TEXT);");
         runner.execute("INSERT INTO students (id, name) VALUES (1, \"Rishi\");");
 
-        Path rowsPath = tempDir.resolve("students").resolve("rows.bin");
+        Path rowsPath = tempDir.resolve("students").resolve("table.dat");
         Schema schema = new Schema(List.of(
                 new Column("id", Type.INT),
                 new Column("name", Type.TEXT)
@@ -118,7 +106,7 @@ public class BadQueryTests {
         runner.execute("CREATE TABLE students (id INT, name TEXT);");
         runner.execute("INSERT INTO students (id, name) VALUES (1, \"Rishi\");");
 
-        Path rowsPath = tempDir.resolve("students").resolve("rows.bin");
+        Path rowsPath = tempDir.resolve("students").resolve("table.dat");
         Schema schema = new Schema(List.of(
                 new Column("id", Type.INT),
                 new Column("name", Type.TEXT)

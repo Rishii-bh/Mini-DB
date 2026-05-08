@@ -1,6 +1,7 @@
 package MiniDB.query.analyzer;
 
 import MiniDB.StorageEngine.BinaryFileStorage;
+import MiniDB.StorageEngine.PageFileStorage;
 import MiniDB.StorageEngine.TextFileStorageEngine;
 import MiniDB.core.Column;
 import MiniDB.core.Schema;
@@ -14,10 +15,10 @@ import java.util.List;
 import java.util.Optional;
 
 public class SelectAnalyzer {
-    private final BinaryFileStorage binaryFileStorage;
+    private final PageFileStorage pageFileStorage;
 
-    public SelectAnalyzer(BinaryFileStorage binaryFileStorage) {
-        this.binaryFileStorage = binaryFileStorage;
+    public SelectAnalyzer(PageFileStorage binaryFileStorage) {
+        this.pageFileStorage = binaryFileStorage;
 
     }
 
@@ -26,10 +27,10 @@ public class SelectAnalyzer {
         if(tableName == null||tableName.isEmpty()) {
             throw new RuntimeException("Table name is null or empty");
         }
-        if(!binaryFileStorage.tableExists(tableName)) {
+        if(!pageFileStorage.tableExists(tableName)) {
             throw new RuntimeException("Table " + query.getTableName() + " does not exist");
         }
-        Schema tableSchema = binaryFileStorage.getSchema(tableName);
+        Schema tableSchema = pageFileStorage.getSchema(tableName);
         List<Column> resultColumns = new ArrayList<Column>();
         //use next line
         List<Integer> selectedColIndex = new ArrayList<>();

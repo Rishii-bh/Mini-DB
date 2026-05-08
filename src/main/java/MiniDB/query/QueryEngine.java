@@ -1,6 +1,7 @@
 package MiniDB.query;
 
 import MiniDB.StorageEngine.BinaryFileStorage;
+import MiniDB.StorageEngine.PageFileStorage;
 import MiniDB.query.analyzer.CreateAnalyzer;
 import MiniDB.query.analyzer.DeleteAnalyzer;
 import MiniDB.query.analyzer.InsertAnalyzer;
@@ -22,12 +23,12 @@ public class QueryEngine {
     private final CreateAnalyzer createAnalyzer;
     private final DeleteAnalyzer deleteAnalyzer;
 
-    public QueryEngine(BinaryFileStorage binaryFileStorage) {
-        this.selectAnalyzer = new SelectAnalyzer(binaryFileStorage);
-        this.executor = new QueryExecutor(binaryFileStorage);
-        this.insertAnalyzer = new InsertAnalyzer(binaryFileStorage);
-        this.createAnalyzer = new CreateAnalyzer(binaryFileStorage);
-        this.deleteAnalyzer = new DeleteAnalyzer(binaryFileStorage);
+    public QueryEngine(PageFileStorage pageFileStorage) {
+        this.selectAnalyzer = new SelectAnalyzer(pageFileStorage);
+        this.executor = new QueryExecutor(pageFileStorage);
+        this.insertAnalyzer = new InsertAnalyzer(pageFileStorage);
+        this.createAnalyzer = new CreateAnalyzer(pageFileStorage);
+        this.deleteAnalyzer = new DeleteAnalyzer(pageFileStorage);
     }
 
     public QueryResult execute(Query query){

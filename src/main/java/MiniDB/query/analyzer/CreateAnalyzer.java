@@ -1,6 +1,7 @@
 package MiniDB.query.analyzer;
 
 import MiniDB.StorageEngine.BinaryFileStorage;
+import MiniDB.StorageEngine.PageFileStorage;
 import MiniDB.core.Column;
 import MiniDB.query.rawqueries.CreateTableQuery;
 import MiniDB.query.resolved.ResolvedCreateTableQuery;
@@ -11,9 +12,9 @@ import java.util.Set;
 
 public class CreateAnalyzer {
 
-    private final BinaryFileStorage binaryFileStorage;
-    public CreateAnalyzer( BinaryFileStorage binaryFileStorage) {
-        this.binaryFileStorage = binaryFileStorage;
+    private final PageFileStorage pageFileStorage;
+    public CreateAnalyzer( PageFileStorage pageFileStorage) {
+        this.pageFileStorage = pageFileStorage;
     }
 
     public ResolvedCreateTableQuery resolve(CreateTableQuery createTableQuery) {
@@ -21,7 +22,7 @@ public class CreateAnalyzer {
            throw new RuntimeException("Table name cannot be empty");
        }
        String tableName = createTableQuery.getTableName();
-       if(binaryFileStorage.tableExists(tableName)){
+       if(pageFileStorage.tableExists(tableName)){
            throw new RuntimeException("Table " + tableName + " already exists");
        }
 

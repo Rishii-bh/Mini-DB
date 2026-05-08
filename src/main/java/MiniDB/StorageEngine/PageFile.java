@@ -68,4 +68,14 @@ public class PageFile {
         writePage(page, pageNo);
         return pageNo;
     }
+
+    public void truncate() {
+        try(RandomAccessFile raf = new RandomAccessFile(filePath.toFile(), "rw")){
+            raf.setLength(0);
+        } catch (FileNotFoundException e) {
+            throw new StorageException("Table Path does not exist!" ,e);
+        } catch (IOException e) {
+            throw new StorageException("Error truncating file!" ,e);
+        }
+    }
 }

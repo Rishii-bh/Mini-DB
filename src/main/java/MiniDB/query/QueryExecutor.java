@@ -1,6 +1,7 @@
 package MiniDB.query;
 
 import MiniDB.StorageEngine.BinaryFileStorage;
+import MiniDB.StorageEngine.PageFileStorage;
 import MiniDB.core.*;
 import MiniDB.query.condition.Condition;
 import MiniDB.query.resolved.ResolvedCreateTableQuery;
@@ -17,23 +18,24 @@ import java.util.List;
 import java.util.Optional;
 
 public class QueryExecutor {
-    private final BinaryFileStorage binaryFileStorage;
+    private final PageFileStorage pageFileStorage;
 
-    public QueryExecutor(BinaryFileStorage binaryFileStorage) {
-        this.binaryFileStorage = binaryFileStorage;
+    public QueryExecutor(PageFileStorage pageFileStorage) {
+
+        this.pageFileStorage = pageFileStorage;
     }
 
     public SelectQueryResult executeSelectQuery(ResolvedSelectQuery resolvedQuery) {
         //original table and original schema
         String tableName = resolvedQuery.getTableName();
-        Schema schema = binaryFileStorage.getSchema(tableName);
+        Schema schema = pageFileStorage.getSchema(tableName);
         Optional<Condition> conditionOptional = resolvedQuery.getResolvedCondition();
         if(conditionOptional.isEmpty()) {
 
             List<Row> resultRows = new ArrayList<>();
-            for(int i=0; i<binaryFileStorage.getRows(tableName).size();i++){
+            for(int i=0; i<pageFileStorage.getRows(tableName).size();i++){
                 List<Object> values = new ArrayList<>();
-                Row row = binaryFileStorage.getRows(tableName).get(i);
+                Row row = pageFileStorage.getRows(tableName).get(i);
                 for(int num : resolvedQuery.getSelectedColIndex()){
                     values.add(row.getValue(num));
                 }
@@ -49,8 +51,8 @@ public class QueryExecutor {
            //extracts the index of the condition column
            int index = schema.getColumnIndex(condition.getExpression1().getCol_name());
             List<Row> resultRows = new ArrayList<>();
-            List<Row> originalRows = binaryFileStorage.getRows(tableName);
-            for(int i=0;i<binaryFileStorage.getRows(tableName).size();i++){
+            List<Row> originalRows = pageFileStorage.getRows(tableName);
+            for(int i=0;i<pageFileStorage.getRows(tableName).size();i++){
 //validating for each row before addinf the selected columns
                 //normal select where eg: age >18 || name = "rishi" type checking
                 //all types of checks found in the condition class
@@ -72,24 +74,24 @@ public class QueryExecutor {
 
     public InsertQueryResult executeInsertQuery(ResolvedInsertQuery resolvedInsertQuery) {
         String tableName = resolvedInsertQuery.getTable();
-        binaryFileStorage.insertRow(tableName,resolvedInsertQuery.getRow());
+        pageFileStorage.insertRow(tableName,resolvedInsertQuery.getRow());
         return new InsertQueryResult(1, "1 row inserted");
     }
 
     public CreateTableQueryResult executeCreateQuery(ResolvedCreateTableQuery resolvedCreateTableQuery) {
         Schema schema = new Schema(resolvedCreateTableQuery.getColumns());
-        binaryFileStorage.createTable(resolvedCreateTableQuery.getTableName(), schema);
+        pageFileStorage.createTable(resolvedCreateTableQuery.getTableName(), schema);
         return new CreateTableQueryResult(resolvedCreateTableQuery.getTableName(), schema.size());
     }
 
     public DeleteQueryResult executeDeleteQuery(ResolvedDeleteQuery resolvedDeleteQuery) {
         String tableName = resolvedDeleteQuery.getTableName();
-        int tableRowCount = binaryFileStorage.getRows(tableName).size();
+        int tableRowCount = pageFileStorage.getRows(tableName).size();
         Condition condition = resolvedDeleteQuery.getCondition();
         int colToCheckIndex = resolvedDeleteQuery.getColToCheckIndex();
         Integer numOfRowsDeleted =0;
         List<Row> resultRows = new ArrayList<>();
-        List<Row> allRows = binaryFileStorage.getRows(tableName);
+        List<Row> allRows = pageFileStorage.getRows(tableName);
         for(Row row : allRows){
             if(condition.evaluate(row.getValue(colToCheckIndex))){
                 numOfRowsDeleted++;
@@ -97,7 +99,7 @@ public class QueryExecutor {
             }
             resultRows.add(row);
         }
-        binaryFileStorage.replaceRows(tableName,resultRows);
+        pageFileStorage.replaceRows(tableName,resultRows);
 
         return new DeleteQueryResult(tableName, numOfRowsDeleted);
     }

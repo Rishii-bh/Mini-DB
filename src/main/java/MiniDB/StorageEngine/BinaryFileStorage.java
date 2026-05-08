@@ -53,6 +53,7 @@ public class BinaryFileStorage implements StorageEngine {
         }
     }
 
+    @Override
     public void createTable(String table_name, Schema schema) {
         Path tableDir = tableDir(table_name);
         Path schemaFiles = schemaFile(table_name);

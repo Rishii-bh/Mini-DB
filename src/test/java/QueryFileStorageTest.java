@@ -1,7 +1,4 @@
-import MiniDB.StorageEngine.BinaryFileStorage;
-import MiniDB.StorageEngine.TextFileStorageEngine;
-import MiniDB.StorageEngine.RowSerializer;
-import MiniDB.StorageEngine.SchemaSerializer;
+import MiniDB.StorageEngine.*;
 import MiniDB.query.QueryEngine;
 import MiniDB.query.QueryResult;
 import MiniDB.query.results.SelectQueryResult;
@@ -21,8 +18,8 @@ public class QueryFileStorageTest {
 
     @Test
     void createTableInsertIntoTableAndSelectFromTable() throws IOException {
-        BinaryFileStorage binaryFileStorage = new BinaryFileStorage(tempDir);
-        QueryEngine queryEngine = new QueryEngine(binaryFileStorage);
+        PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
+        QueryEngine queryEngine = new QueryEngine(pageFileStorage);
         SqlRunner sqlRunner = new SqlRunner(queryEngine);
 
         sqlRunner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
