@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PageFileStorage implements StorageEngine {
+public class PageFileStorage  {
     private final String SCHEMA_FILE_NAME = "schema.meta";
     private final String TABLE_FILE_NAME = "table.dat";
     private final BinaryRowSerializer rowSerializer;
@@ -55,7 +55,7 @@ public class PageFileStorage implements StorageEngine {
         return new PageFile(tablesFile(tableName));
     }
 
-    @Override
+
     public void createTable(String table_name, Schema schema) {
         Path tableDir = tableDir(table_name);
         Path schemaFiles = schemaFile(table_name);
@@ -75,13 +75,13 @@ public class PageFileStorage implements StorageEngine {
         }
     }
 
-    @Override
+
     public boolean tableExists(String table_name) {
         Path tableDir = tableDir(table_name);
         return Files.exists(tableDir);
     }
 
-    @Override
+
     public Schema getSchema(String table_name) {
         Path tableDir = tableDir(table_name);
         Path schemaFiles = schemaFile(table_name);
@@ -95,7 +95,6 @@ public class PageFileStorage implements StorageEngine {
         }
     }
 
-    @Override
     public List<Row> getRows(String table_name) {
         Path tableDir = tableDir(table_name);
         Path schemaFiles = schemaFile(table_name);
@@ -125,8 +124,7 @@ public class PageFileStorage implements StorageEngine {
         return rows;
     }
 
-    @Override
-    public void insertRow(String table_name, Row row) {
+    public RecordId insertRow(String table_name, Row row) {
         Path tableDir = tableDir(table_name);
         Path schemaFiles = schemaFile(table_name);
         Path tablesFiles = tablesFile(table_name);
@@ -144,7 +142,7 @@ public class PageFileStorage implements StorageEngine {
                     slotId =page.tryInsert(rowBytes);
                     if(slotId != -1){
                         pageFile.writePage(page, i);
-                        return;
+                        return new RecordId(i,slotId);
                     }
 
             }
@@ -154,6 +152,7 @@ public class PageFileStorage implements StorageEngine {
                 throw new StorageException("Row Size too big for a single page");
             }
             pageFile.appendPage(page);
+            return new RecordId(0,slotId);
 
 
         } catch (RuntimeException e) {
@@ -161,7 +160,7 @@ public class PageFileStorage implements StorageEngine {
         }
     }
 
-    @Override
+
     public void replaceRows(String table_name, List<Row> rows) {
          Path tableDir = tableDir(table_name);
          Path schemaFiles = schemaFile(table_name);
@@ -179,7 +178,94 @@ public class PageFileStorage implements StorageEngine {
              throw new StorageException("Could not replace Rows", e);
          }
     }
+    public RecordId insertRowWithRecordId(String table_name, Row row) {
+        Path tableDir = tableDir(table_name);
+        Path schemaFiles = schemaFile(table_name);
+        Path tablesFiles = tablesFile(table_name);
+        ensureTableDirExists(tableDir);
+        ensureSchemaFileExists(schemaFiles);
+        ensureTableFileExists(tablesFiles);
+        Schema schema = getSchema(table_name);
+        try {
+            PageFile pageFile = getPageFile(table_name);
+            int numOfPages = pageFile.getPageCount();
+            byte[] rowBytes = rowSerializer.serialize(row,schema);
+            for (int i = 0; i < numOfPages; i++) {
+                int slotId =-1;
+                Page page = pageFile.readPage(i);
+                slotId =page.tryInsert(rowBytes);
+                if(slotId != -1){
+                    pageFile.writePage(page, i);
+                    return new RecordId(i,slotId);
+                }
 
+            }
+            Page page = Page.createEmptyPage();
+            int slotId = page.tryInsert(rowBytes);
+            if(slotId == -1){
+                throw new StorageException("Row Size too big for a single page");
+            }
+            int pageNo = pageFile.appendPage(page);
+            return new RecordId(pageNo,slotId);
+
+
+        } catch (RuntimeException e) {
+            throw new StorageException("Could not insert Row", e);
+        }
+    }
+
+    public Row getRowByRecordId(String table_name, RecordId recordId) {
+        if(recordId == null|| recordId.PageNo() < 0 || recordId.SlotId() < 0){
+            throw new StorageException("RecordId is null or unspecified value");
+        }
+        Path tableDir = tableDir(table_name);
+        Path schemaFiles = schemaFile(table_name);
+        Path tablesFiles = tablesFile(table_name);
+        ensureTableDirExists(tableDir);
+        ensureSchemaFileExists(schemaFiles);
+        ensureTableFileExists(tablesFiles);
+        Schema schema = getSchema(table_name);
+        try{
+            PageFile pageFile = getPageFile(table_name);
+            Page page = pageFile.readPage(recordId.PageNo());
+            byte[] rowBytes = page.getRowBytes(recordId.SlotId());
+            Row row = rowSerializer.deserialize(rowBytes,schema);
+            return row;
+
+        }catch (RuntimeException e){
+            throw new StorageException("Could not get Row", e);
+        }
+
+    }
+
+    public List<RowWithRecordId> scanRows(String table_name) {
+        Path tableDir = tableDir(table_name);
+        Path schemaFiles = schemaFile(table_name);
+        Path tablesFiles = tablesFile(table_name);
+        ensureTableDirExists(tableDir);
+        ensureSchemaFileExists(schemaFiles);
+        ensureTableFileExists(tablesFiles);
+        Schema schema = getSchema(table_name);
+        List<RowWithRecordId> rows = new ArrayList<>();
+        try{
+            PageFile pageFile = getPageFile(table_name);
+            int pageCount = pageFile.getPageCount();
+            for (int i = 0; i < pageCount; i++) {
+                Page page = pageFile.readPage(i);
+                for(int slotId = 0; slotId < page.getSlotCount(); slotId++){
+                    byte[] rowBytes = page.getRowBytes(slotId);
+                    Row row = rowSerializer.deserialize(rowBytes,schema);
+                    rows.add(new RowWithRecordId(row,new RecordId(i,slotId)));
+                }
+            }
+        }catch (RuntimeException e){
+            throw new StorageException("Could not get Rows", e);
+        }
+        return rows;
+    }
+
+
+//HELPERS
     private void ensureTableDirExists(Path tableDir) {
         if(!Files.exists(tableDir)) {
             throw new StorageException("Table directory does not exist: " + tableDir);

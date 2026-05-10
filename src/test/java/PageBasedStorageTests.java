@@ -1,6 +1,5 @@
 import MiniDB.StorageEngine.*;
-import MiniDB.core.Row;
-import MiniDB.core.Schema;
+import MiniDB.core.*;
 import MiniDB.query.QueryEngine;
 import MiniDB.query.QueryResult;
 import MiniDB.query.results.SelectQueryResult;
@@ -20,7 +19,8 @@ public class PageBasedStorageTests {
 
     private SqlRunner newRunner() {
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        QueryEngine queryEngine = new QueryEngine(pageFileStorage);
+        IndexManager indexManager = new IndexManager(pageFileStorage);
+        QueryEngine queryEngine = new QueryEngine(pageFileStorage , indexManager);
         return new SqlRunner(queryEngine);
     }
 
@@ -96,4 +96,139 @@ public class PageBasedStorageTests {
         SelectQueryResult selectQueryResult = (SelectQueryResult) result;
         assertEquals(5, selectQueryResult.getRowCount());
     }
+    @Test
+    void insertRowWithRecordIdAndFetch(){
+        PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
+        Schema schema = new Schema(List.of(
+                new Column("id", Type.INT),
+                new Column("name", Type.TEXT),
+                new Column("active", Type.BOOL)
+        ));
+        String tableName = "students";
+        pageFileStorage.createTable(tableName, schema);
+        Row row = new Row(List.of(1 ,"Rishi",true));
+//        Row row2 = new Row(List.of(2 ,"Alex",false));
+        RecordId recordId = pageFileStorage.insertRowWithRecordId(tableName,row);
+//        RecordId recordId2 = pageFileStorage.insertRowWithRecordId(tableName,row2);
+        Row persistedRow = pageFileStorage.getRowByRecordId(tableName,recordId);
+        assertEquals(row.getRow(),persistedRow.getRow());
+
+    }
+
+    //INDEX BASED TESTS
+
+    @Test
+    void indexTestShouldCreateIndexAndFetchRecordIdsThrowWhenColNameMissing() throws Exception {
+        SqlRunner runner = newRunner();
+        runner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
+        runner.execute("Insert into students (id, name, active) values (1, \"Rishi\", true);");
+        runner.execute("Insert into students (id, name, active) values (2, \"Sara\", false);");
+        runner.execute("Insert into students (id, name, active) values (1, \"Alex\", true);");
+        PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
+        IndexBuilder indexBuilder = new IndexBuilder(pageFileStorage);
+        String tableName = "students";
+        String columnName = "active";
+        String missingColumnName = "xyz";
+        InMemoryIndex index = indexBuilder.build(tableName, columnName);
+        Value value = new Value(Type.BOOL , true);
+
+        int numberOfActiveRows = index.get(value).size();
+        List<RecordId> recordIds = index.get(value);
+        List<Row> rows = new ArrayList<>();
+        for(RecordId recordId : recordIds) {
+            rows.add(pageFileStorage.getRowByRecordId(tableName, recordId));
+        }
+        assertEquals("Rishi", rows.get(0).getValue(1));
+        assertEquals("Alex", rows.get(1).getValue(1));
+
+
+        assertEquals(2,numberOfActiveRows);
+
+        assertThrows(CoreLayerException.class ,() -> indexBuilder.build(tableName, missingColumnName));
+
+        Value notIndexedColumnValue = new Value(Type.INT , 1);
+        int numberOfNotIndexedRows = index.get(notIndexedColumnValue).size();
+        assertEquals(0,numberOfNotIndexedRows);
+
+    }
+
+    @Test
+    void selectWhereQueryUsesIndex() throws Exception {
+        PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
+        SpyIndexManager indexManager = new SpyIndexManager(pageFileStorage);
+        QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
+        SqlRunner runner = new SqlRunner(queryEngine);
+        runner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
+        runner.execute("Insert into students (id, name, active) values (1, \"Rishi\", true);");
+        runner.execute("Insert into students (id, name, active) values (2, \"Sara\", false);");
+        runner.execute("Insert into students (id, name, active) values (1, \"Alex\", true);");
+        indexManager.createIndex("students" , "id");
+        QueryResult result = runner.execute("Select name from students where id = 1;");
+        assertInstanceOf(SelectQueryResult.class, result);
+        SelectQueryResult selectQueryResult = (SelectQueryResult) result;
+        assertEquals(2,selectQueryResult.getRowCount());
+        assertTrue(indexManager.searchCalled);
+
+    }
+    @Test
+    void selectWhereQueryUsesFullRowScanWhenNotIndexed() throws Exception {
+        PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
+        SpyIndexManager indexManager = new SpyIndexManager(pageFileStorage);
+        QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
+        SqlRunner runner = new SqlRunner(queryEngine);
+        runner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
+        runner.execute("Insert into students (id, name, active) values (1, \"Rishi\", true);");
+        runner.execute("Insert into students (id, name, active) values (2, \"Sara\", false);");
+        runner.execute("Insert into students (id, name, active) values (1, \"Alex\", true);");
+        indexManager.createIndex("students" , "name");
+        QueryResult result = runner.execute("Select name from students where id = 1;");
+        assertInstanceOf(SelectQueryResult.class, result);
+        SelectQueryResult selectQueryResult = (SelectQueryResult) result;
+        assertEquals(2,selectQueryResult.getRowCount());
+        assertFalse(indexManager.searchCalled);
+
+    }
+
+    @Test
+    void insertQueryOnIndexedTableShouldCreateIndexForNewRow() throws Exception {
+        PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
+        SpyIndexManager indexManager = new SpyIndexManager(pageFileStorage);
+        QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
+        SqlRunner runner = new SqlRunner(queryEngine);
+        runner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
+        runner.execute("Insert into students (id, name, active) values (1, \"Rishi\", true);");
+        runner.execute("Insert into students (id, name, active) values (2, \"Sara\", false);");
+        runner.execute("Insert into students (id, name, active) values (1, \"Alex\", true);");
+
+        indexManager.createIndex("students" , "id");
+        runner.execute("Insert into students (id, name, active) values (3, \"Jones\", false);");
+        assertTrue(indexManager.addValueCalled);
+
+    }
+
+    @Test
+    void deleteQueryOnIndexedTableShouldRebuildIndex() throws Exception {
+        PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
+        SpyIndexManager indexManager = new SpyIndexManager(pageFileStorage);
+        QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
+        SqlRunner runner = new SqlRunner(queryEngine);
+        runner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
+        runner.execute("Insert into students (id, name, active) values (1, \"Rishi\", true);");
+        runner.execute("Insert into students (id, name, active) values (2, \"Sara\", false);");
+        runner.execute("Insert into students (id, name, active) values (2, \"Alex\", true);");
+
+        indexManager.createIndex("students" , "id");
+        runner.execute("Delete from students where id = 1;");
+        QueryResult result = runner.execute("Select name from students where id = 2;");
+        assertInstanceOf(SelectQueryResult.class, result);
+        SelectQueryResult selectQueryResult = (SelectQueryResult) result;
+        assertEquals(2,selectQueryResult.getRowCount());
+        assertTrue(indexManager.rebuildCalled);
+        assertTrue(indexManager.searchCalled);
+    }
+
+
+
+
+
 }

@@ -19,7 +19,8 @@ public class QueryFileStorageTest {
     @Test
     void createTableInsertIntoTableAndSelectFromTable() throws IOException {
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        QueryEngine queryEngine = new QueryEngine(pageFileStorage);
+        IndexManager indexManager = new IndexManager(pageFileStorage);
+        QueryEngine queryEngine = new QueryEngine(pageFileStorage , indexManager);
         SqlRunner sqlRunner = new SqlRunner(queryEngine);
 
         sqlRunner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");

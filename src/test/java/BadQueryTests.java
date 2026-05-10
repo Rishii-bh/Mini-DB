@@ -27,7 +27,8 @@ public class BadQueryTests {
 
     private SqlRunner newRunner() {
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        QueryEngine queryEngine = new QueryEngine(pageFileStorage);
+        IndexManager indexManager = new IndexManager(pageFileStorage);
+        QueryEngine queryEngine = new QueryEngine(pageFileStorage , indexManager);
         return new SqlRunner(queryEngine);
     }
 

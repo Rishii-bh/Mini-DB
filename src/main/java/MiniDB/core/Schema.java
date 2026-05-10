@@ -16,7 +16,7 @@ public class Schema {
         for(int i = 0; i < columns.size(); i++) {
             String colName = columns.get(i).getCol_name();
             if(columnIndex.containsKey(colName)) {
-                throw new IllegalArgumentException("Duplicate column name: " + colName);
+                throw new CoreLayerException("Column " + colName + " already exists");
             }
             columnIndex.put(colName, i);
         }
@@ -33,7 +33,7 @@ public class Schema {
     public Integer getColumnIndex(String colName) {
         Integer colIndex = columnIndex.get(colName);
         if(colIndex == null) {
-            throw new IllegalArgumentException("Column not found: " + colName);
+            throw new CoreLayerException("Column " + colName + " does not exist");
         }
         return colIndex;
     }

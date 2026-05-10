@@ -32,7 +32,7 @@ public class SelectAnalyzer {
         }
         Schema tableSchema = pageFileStorage.getSchema(tableName);
         List<Column> resultColumns = new ArrayList<Column>();
-        //use next line
+
         List<Integer> selectedColIndex = new ArrayList<>();
         for(int i=0; i<query.getColNames().size(); i++) {
             //returns the index of the column which corresponds to the query col
@@ -41,7 +41,7 @@ public class SelectAnalyzer {
             resultColumns.add(column);
             selectedColIndex.add(index);
         }
-        //use this
+
         Schema resultSchema = new Schema(resultColumns);
         Optional<RawConditionQuery> conditionOptional = query.getCondition();
         if(conditionOptional.isPresent()) {
