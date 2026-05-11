@@ -143,7 +143,12 @@ public class PageFileStorage  {
             for (int i = 0; i < numOfPages; i++) {
                 int slotId =-1;
                     Page page = pageFile.readPage(i);
-                    slotId =page.tryInsert(rowBytes);
+                    if(page.reusableSlotExists(rowBytes.length)){
+                        slotId = page.tryInsertInDeletedSlot(rowBytes);
+                    }
+                    else {
+                        slotId =page.tryInsert(rowBytes);
+                    }
                     if(slotId != -1){
                         pageFile.writePage(page, i);
                         return new RecordId(i,slotId);
@@ -165,23 +170,23 @@ public class PageFileStorage  {
     }
 
 
-    public void replaceRows(String table_name, List<Row> rows) {
-         Path tableDir = tableDir(table_name);
-         Path schemaFiles = schemaFile(table_name);
-         Path tablesFiles = tablesFile(table_name);
-         ensureTableDirExists(tableDir);
-         ensureSchemaFileExists(schemaFiles);
-         ensureTableFileExists(tablesFiles);
-         PageFile pageFile = getPageFile(table_name);
-         try{
-             pageFile.truncate();
-             for (Row row : rows) {
-                 insertRow(table_name, row);
-             }
-         } catch (RuntimeException e) {
-             throw new StorageException("Could not replace Rows", e);
-         }
-    }
+//    public void replaceRows(String table_name, List<Row> rows) {
+//         Path tableDir = tableDir(table_name);
+//         Path schemaFiles = schemaFile(table_name);
+//         Path tablesFiles = tablesFile(table_name);
+//         ensureTableDirExists(tableDir);
+//         ensureSchemaFileExists(schemaFiles);
+//         ensureTableFileExists(tablesFiles);
+//         PageFile pageFile = getPageFile(table_name);
+//         try{
+//             pageFile.truncate();
+//             for (Row row : rows) {
+//                 insertRow(table_name, row);
+//             }
+//         } catch (RuntimeException e) {
+//             throw new StorageException("Could not replace Rows", e);
+//         }
+//    }
 
     public Optional<Row> getRowByRecordId(String table_name, RecordId recordId) {
         if(recordId == null|| recordId.PageNo() < 0 || recordId.SlotId() < 0){

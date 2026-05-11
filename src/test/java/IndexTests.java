@@ -14,8 +14,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class IndexTests {
     @TempDir
@@ -81,6 +80,7 @@ public class IndexTests {
         LinkedHashSet<RecordId> nameBucket = indexManager.search("students","name",valueForRishi);
         assertFalse(idBucket.contains(rishiRecordId));
         assertFalse(nameBucket.contains(rishiRecordId));
+        assertTrue(nameBucket== null || nameBucket.isEmpty());
     }
 
 

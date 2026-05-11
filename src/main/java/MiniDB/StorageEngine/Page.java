@@ -6,6 +6,7 @@ public class Page {
     public static final int PAGE_SIZE = 4096;
     private static final int SLOT_COUNT_OFFSET = 0;
     private static final int FREE_SPACE_END_OFFSET= 2;
+    private static final int MAX_REUSABLE_LENGTH_OFFSET = 4;
     private static final int HEADER_SIZE=16;
     private static final int SLOT_SIZE =5;
     private final byte[] data;
@@ -30,6 +31,7 @@ public class Page {
         Page page = new Page(data);
         page.setSlotCount(0);
         page.setFreeSpaceEnd(PAGE_SIZE);
+        page.setMaxReusableLength(0);
         return page;
     }
 
@@ -64,6 +66,14 @@ public class Page {
 
     public int getAvailableSpace() {
         return getFreeSpaceEnd() - getFreeSpaceStart();
+    }
+
+    public int getMaxReusableLength() {
+        return readShort(MAX_REUSABLE_LENGTH_OFFSET);
+    }
+
+    public void setMaxReusableLength(int maxReusableLength) {
+        writeShort(MAX_REUSABLE_LENGTH_OFFSET,maxReusableLength);
     }
 
     private int slotOffset(int slotId) {
@@ -125,6 +135,38 @@ public class Page {
         setFreeSpaceEnd(getFreeSpaceEnd()-rowBytes.length);
         return slotId;
     }
+    public boolean reusableSlotExists(int length) {
+        return getMaxReusableLength()>=length;
+    }
+
+    public int tryInsertInDeletedSlot(byte[] rowBytes) {
+        if(rowBytes == null){
+            throw new StorageException("Row bytes cannot be null!");
+        }
+        int slotCount = getSlotCount();
+        for(int slotId=0; slotId<slotCount; slotId++) {
+            Slot slot = readSlot(slotId);
+            if(slot.deleted() && slot.length()>= rowBytes.length) {
+                writeSlot(slotId, slot.offset(), rowBytes.length , false);
+                System.arraycopy(rowBytes,0,data, slot.offset(), rowBytes.length);
+                computeMaxReusableSlotLength();
+                return slotId;
+            }
+        }
+        return -1;
+    }
+
+    private void computeMaxReusableSlotLength(){
+        int slotCount = getSlotCount();
+        int maxReusableLength =0;
+        for(int slotId=0; slotId<slotCount; slotId++) {
+            Slot slot = readSlot(slotId);
+            if(slot.deleted() && slot.length()>= maxReusableLength) {
+                maxReusableLength = slot.length();
+            }
+        }
+        setMaxReusableLength(maxReusableLength);
+    }
 
     public byte[] getRowBytes(int slotId) {
         if(slotId<0 || slotId>=getSlotCount()) {
@@ -152,6 +194,9 @@ public class Page {
             return;
         }
         writeSlot(slotId,slot.offset(),slot.length(),true);
+        if(slot.length() > getMaxReusableLength()){
+            setMaxReusableLength(slot.length());
+        }
     }
 
     public boolean isDeletedSlot(int slotId) {

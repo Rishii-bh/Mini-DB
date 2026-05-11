@@ -79,7 +79,7 @@ public class QueryExecutor {
             }
             List<Row> originalRows = pageFileStorage.getRows(tableName);
             for (int i = 0; i < pageFileStorage.getRows(tableName).size(); i++) {
-//validating for each row before addinf the selected columns
+//validating for each row before adding the selected columns
                 //normal select where eg: age >18 || name = "rishi" type checking
                 //all types of checks found in the condition class
                 Row row = originalRows.get(i);
