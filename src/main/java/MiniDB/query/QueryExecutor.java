@@ -14,6 +14,7 @@ import MiniDB.query.results.InsertQueryResult;
 import MiniDB.query.results.SelectQueryResult;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -58,7 +59,7 @@ public class QueryExecutor {
                     indexManager.hasIndexKey(tableName, colInCondition)) {
                 Type type = condition.getExpression1().getType();
                 Value value = ValueFactory.fromLiteral(condition.getValue() , type);
-                List<RecordId> recordIds = indexManager.search(tableName, colInCondition, value);
+                LinkedHashSet<RecordId> recordIds = indexManager.search(tableName, colInCondition, value);
                 List<Row> rowsFromRecordId = new ArrayList<>();
                 for (RecordId recordId : recordIds) {
                     Optional<Row> rowOptional = pageFileStorage.getRowByRecordId(tableName, recordId);
@@ -122,24 +123,21 @@ public class QueryExecutor {
         Condition condition = resolvedDeleteQuery.getCondition();
         int colToCheckIndex = resolvedDeleteQuery.getColToCheckIndex();
         int numOfRowsDeleted =0;
-        List<RowWithRecordId> resultRows = new ArrayList<>();
+        List<RowWithRecordId> deletedRows = new ArrayList<>();
         List<RowWithRecordId> allRows = pageFileStorage.scanRows(tableName);
 
         for(RowWithRecordId rowWithRecordId : allRows){
             Row currentRow = rowWithRecordId.row();
             if(condition.evaluate(currentRow.getValue(colToCheckIndex))){
                 numOfRowsDeleted++;
-                resultRows.add(rowWithRecordId);
+                deletedRows.add(rowWithRecordId);
             }
         }
-        pageFileStorage.markDelete(tableName,resultRows);
-        String colInCondition = condition.getExpression1().getCol_name();
-        if(indexManager.hasIndexKey(tableName, colInCondition)) {
-            Object literal = condition.getValue();
-            Type type = condition.getExpression1().getType();
-            Value value = ValueFactory.fromLiteral(literal , type);
-            indexManager.deleteRecordIds(tableName,colInCondition,value);
+        pageFileStorage.markDelete(tableName,deletedRows);
+        if(indexManager.tableHasIndex(tableName)){
+            indexManager.deleteRecordIds(tableName,deletedRows);
         }
+
 
         return new DeleteQueryResult(tableName, numOfRowsDeleted);
     }

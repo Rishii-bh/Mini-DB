@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -140,7 +141,7 @@ public class PageBasedStorageTests {
         Value value = new Value(Type.BOOL , true);
 
         int numberOfActiveRows = index.get(value).size();
-        List<RecordId> recordIds = index.get(value);
+        LinkedHashSet<RecordId> recordIds = index.get(value);
         List<Row> rows = new ArrayList<>();
         for(RecordId recordId : recordIds) {
             Optional<Row> rowOptional = pageFileStorage.getRowByRecordId(tableName,recordId);
@@ -309,7 +310,7 @@ public class PageBasedStorageTests {
 
         Value valueToBeDeleted = new Value(Type.INT , 1);
         runner.execute("DELETE FROM students WHERE id = 1;");
-        List<RecordId> list = indexManager.search("students", "id", valueToBeDeleted);
+        LinkedHashSet<RecordId> list = indexManager.search("students", "id", valueToBeDeleted);
         assertEquals(0, list.size());
 
     }

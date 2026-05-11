@@ -4,10 +4,8 @@ import MiniDB.core.Row;
 import MiniDB.core.Schema;
 import MiniDB.core.Value;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class IndexManager {
     private final Map<IndexKey, InMemoryIndex> indexMap;
@@ -34,8 +32,17 @@ public class IndexManager {
         return indexMap.containsKey(key);
     }
 
+    public boolean tableHasIndex(String tableName) {
+        for(IndexKey key : indexMap.keySet()) {
+            if(key.tableName().equals(tableName)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-    public List<RecordId> search(String tableName,String colName, Value valueKey) {
+
+    public LinkedHashSet<RecordId> search(String tableName, String colName, Value valueKey) {
         IndexKey indexKey = new IndexKey(tableName, colName);
         if(hasIndexKey(tableName,colName)) {
             InMemoryIndex indexedCol = indexMap.get(indexKey);
@@ -71,13 +78,36 @@ public class IndexManager {
         }
     }
 
-    public void deleteRecordIds(String tableName,String colName, Value valueKey) {
-        IndexKey indexKey = new IndexKey(tableName, colName);
-        if(hasIndexKey(tableName,colName)) {
-            InMemoryIndex indexedCol = indexMap.get(indexKey);
-            indexedCol.delete(valueKey);
-            return;
+    public void deleteRecordIds(String tableName, List<RowWithRecordId> rowWithRecordIds) {
+        if(tableName == null || rowWithRecordIds == null ) {
+            throw new IndexException("TableName and RowWithRecordIds cannot be null");
         }
-        throw new IndexException("Column '" + colName + "' is Not indexed");
+        List<IndexKey> indexKeys = new ArrayList<>();
+        for(IndexKey key : indexMap.keySet()) {
+            if(key.tableName().equals(tableName)) {
+                indexKeys.add(key);
+            }
+        }
+        Schema schema = pageFileStorage.getSchema(tableName);
+        for(IndexKey key : indexKeys) {
+            InMemoryIndex indexedCol = indexMap.get(key);
+            String colName = key.columnName();
+            int columnIndex = schema.getColumnIndex(colName);
+
+           for(RowWithRecordId rowWithRecordId : rowWithRecordIds) {
+               Row row = rowWithRecordId.row();
+               RecordId rid = rowWithRecordId.getRecordId();
+               Value value = indexBuilder.extract(row,schema,columnIndex);
+               LinkedHashSet<RecordId> bucket = indexedCol.get(value);
+               if(bucket == null) {
+                   throw new IllegalStateException("Bucket at"+ rowWithRecordId.getRecordId() + " is null");
+               }
+               bucket.remove(rid);
+               if(bucket.isEmpty()) {
+                   indexedCol.delete(value);
+               }
+           }
+        }
+
     }
 }

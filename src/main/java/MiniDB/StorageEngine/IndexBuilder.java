@@ -5,10 +5,7 @@ import MiniDB.core.Schema;
 import MiniDB.core.Type;
 import MiniDB.core.Value;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class IndexBuilder {
     PageFileStorage storage;
@@ -23,11 +20,11 @@ public class IndexBuilder {
         Schema schema = storage.getSchema(tableName);
         int colIndex = schema.getColumnIndex(columnName);
         List<RowWithRecordId> rowsWithRecordIds = storage.scanRows(tableName);
-        Map<Value , List<RecordId>> index = new HashMap<>();
+        Map<Value , LinkedHashSet<RecordId>> index = new HashMap<>();
         for(RowWithRecordId rowWithRecordId : rowsWithRecordIds) {
             Row row = rowWithRecordId.row();
             Value value = extract(row,schema,colIndex);
-          index.computeIfAbsent(value, k -> new ArrayList<>()).add(rowWithRecordId.recordId());
+          index.computeIfAbsent(value, k -> new LinkedHashSet<>()).add(rowWithRecordId.recordId());
         }
         return new InMemoryIndex(tableName,columnName,index);
     }

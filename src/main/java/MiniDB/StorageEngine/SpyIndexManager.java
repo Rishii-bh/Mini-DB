@@ -3,6 +3,7 @@ package MiniDB.StorageEngine;
 import MiniDB.core.Row;
 import MiniDB.core.Value;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 //this class is a mock class purely used for testing purposes
 public class SpyIndexManager extends IndexManager {
@@ -15,7 +16,7 @@ public class SpyIndexManager extends IndexManager {
     }
 
     @Override
-    public List<RecordId> search(String tableName, String colName, Value value) {
+    public LinkedHashSet<RecordId> search(String tableName, String colName, Value value) {
         searchCalled = true;
         return super.search(tableName, colName, value);
     }
