@@ -1,11 +1,13 @@
 package MiniDB.StorageEngine;
 
+import java.util.Optional;
+
 public class Page {
     public static final int PAGE_SIZE = 4096;
     private static final int SLOT_COUNT_OFFSET = 0;
     private static final int FREE_SPACE_END_OFFSET= 2;
     private static final int HEADER_SIZE=16;
-    private static final int SLOT_SIZE =4;
+    private static final int SLOT_SIZE =5;
     private final byte[] data;
 //This Page basically acts as a wrapper for 4096 bytes. Header space is 16Bytes reserved and the rest is free
     //Slot data starts from where header ends and row data starts from the end
@@ -68,10 +70,11 @@ public class Page {
         return HEADER_SIZE + slotId * SLOT_SIZE;
     }
 
-    public void writeSlot(int slotId, int rowOffSet, int length) {
+    public void writeSlot(int slotId, int rowOffSet, int length , boolean deleted) {
         int pos = slotOffset(slotId);
         writeShort(pos, rowOffSet);
         writeShort(pos+2, length);
+        writeBoolean(pos+4,deleted);
     }
 
     public Slot readSlot(int slotId) {
@@ -81,7 +84,8 @@ public class Page {
         int pos = slotOffset(slotId);
         int rowOffSet = readShort(pos);
         int length = readShort(pos+2);
-        return new Slot(rowOffSet, length);
+        boolean deleted = readDeletedFlag(pos+4);
+        return new Slot(rowOffSet, length,deleted);
     }
 
     private int readShort(int offset) {
@@ -98,6 +102,14 @@ public class Page {
         data[offset + 1] = (byte) (value & 0xFF);
     }
 
+    private boolean readDeletedFlag(int offset) {
+        return data[offset] != 0;
+    }
+
+    private void writeBoolean(int offset , boolean value) {
+        data[offset] = (byte) (value ? 1 : 0);
+    }
+
     public int tryInsert(byte[] rowBytes) {
         if(rowBytes == null){
             throw new StorageException("Row bytes cannot be null!");
@@ -108,7 +120,7 @@ public class Page {
         int slotId = getSlotCount();
         incrementSlotCount();
         int rowOffSet = getFreeSpaceEnd()- rowBytes.length;
-        writeSlot(slotId, rowOffSet, rowBytes.length);
+        writeSlot(slotId, rowOffSet, rowBytes.length , false);
         System.arraycopy(rowBytes, 0, data, rowOffSet , rowBytes.length);
         setFreeSpaceEnd(getFreeSpaceEnd()-rowBytes.length);
         return slotId;
@@ -122,5 +134,31 @@ public class Page {
         byte[] rowBytes = new byte[slot.length()];
         System.arraycopy(data,slot.offset(),rowBytes,0,slot.length());
         return rowBytes;
+    }
+
+    public Optional<byte[]> readLiveRowBytes(int slotId) {
+        if(isDeletedSlot(slotId)) {
+            return Optional.empty();
+        }
+        return Optional.of(getRowBytes(slotId));
+    }
+
+    public void markSlotAsDeleted(int slotId) {
+        Slot slot = readSlot(slotId);
+        if(slot == null) {
+            throw new StorageException("Invalid slot ID!");
+        }
+        if(slot.deleted()){
+            return;
+        }
+        writeSlot(slotId,slot.offset(),slot.length(),true);
+    }
+
+    public boolean isDeletedSlot(int slotId) {
+        Slot slot = readSlot(slotId);
+        if(slot == null) {
+            throw new StorageException("Invalid slot ID!");
+        }
+        return slot.deleted();
     }
 }

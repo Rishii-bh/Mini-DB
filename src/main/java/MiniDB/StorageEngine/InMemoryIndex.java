@@ -29,4 +29,7 @@ public class InMemoryIndex {
     public String getColumnName() {
         return columnName;
     }
+    public void delete(Value key) {
+        indexEntries.remove(key);
+    }
 }

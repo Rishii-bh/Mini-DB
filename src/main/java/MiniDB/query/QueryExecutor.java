@@ -1,9 +1,6 @@
 package MiniDB.query;
 
-import MiniDB.StorageEngine.BinaryFileStorage;
-import MiniDB.StorageEngine.IndexManager;
-import MiniDB.StorageEngine.PageFileStorage;
-import MiniDB.StorageEngine.RecordId;
+import MiniDB.StorageEngine.*;
 import MiniDB.core.*;
 import MiniDB.query.condition.Condition;
 import MiniDB.query.condition.Operator;
@@ -60,11 +57,15 @@ public class QueryExecutor {
             if (condition.getOperator()== Operator.EQUALTO &&
                     indexManager.hasIndexKey(tableName, colInCondition)) {
                 Type type = condition.getExpression1().getType();
-                Value value = new Value(type, condition.getValue());
+                Value value = ValueFactory.fromLiteral(condition.getValue() , type);
                 List<RecordId> recordIds = indexManager.search(tableName, colInCondition, value);
                 List<Row> rowsFromRecordId = new ArrayList<>();
                 for (RecordId recordId : recordIds) {
-                    rowsFromRecordId.add(pageFileStorage.getRowByRecordId(tableName, recordId));
+                    Optional<Row> rowOptional = pageFileStorage.getRowByRecordId(tableName, recordId);
+                    if(rowOptional.isEmpty()){
+                        continue;
+                    }
+                    rowsFromRecordId.add(rowOptional.get());
                 }
                 List<Object> values = new ArrayList<>();
                 for (Row row : rowsFromRecordId) {
@@ -118,21 +119,27 @@ public class QueryExecutor {
 
     public DeleteQueryResult executeDeleteQuery(ResolvedDeleteQuery resolvedDeleteQuery) {
         String tableName = resolvedDeleteQuery.getTableName();
-        int tableRowCount = pageFileStorage.getRows(tableName).size();
         Condition condition = resolvedDeleteQuery.getCondition();
         int colToCheckIndex = resolvedDeleteQuery.getColToCheckIndex();
-        Integer numOfRowsDeleted =0;
-        List<Row> resultRows = new ArrayList<>();
-        List<Row> allRows = pageFileStorage.getRows(tableName);
-        for(Row row : allRows){
-            if(condition.evaluate(row.getValue(colToCheckIndex))){
+        int numOfRowsDeleted =0;
+        List<RowWithRecordId> resultRows = new ArrayList<>();
+        List<RowWithRecordId> allRows = pageFileStorage.scanRows(tableName);
+
+        for(RowWithRecordId rowWithRecordId : allRows){
+            Row currentRow = rowWithRecordId.row();
+            if(condition.evaluate(currentRow.getValue(colToCheckIndex))){
                 numOfRowsDeleted++;
-                continue;
+                resultRows.add(rowWithRecordId);
             }
-            resultRows.add(row);
         }
-        pageFileStorage.replaceRows(tableName,resultRows);
-        indexManager.reBuildIndex(tableName);
+        pageFileStorage.markDelete(tableName,resultRows);
+        String colInCondition = condition.getExpression1().getCol_name();
+        if(indexManager.hasIndexKey(tableName, colInCondition)) {
+            Object literal = condition.getValue();
+            Type type = condition.getExpression1().getType();
+            Value value = ValueFactory.fromLiteral(literal , type);
+            indexManager.deleteRecordIds(tableName,colInCondition,value);
+        }
 
         return new DeleteQueryResult(tableName, numOfRowsDeleted);
     }

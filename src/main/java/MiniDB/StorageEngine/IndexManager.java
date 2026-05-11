@@ -70,4 +70,14 @@ public class IndexManager {
             createIndex(table,columnName);
         }
     }
+
+    public void deleteRecordIds(String tableName,String colName, Value valueKey) {
+        IndexKey indexKey = new IndexKey(tableName, colName);
+        if(hasIndexKey(tableName,colName)) {
+            InMemoryIndex indexedCol = indexMap.get(indexKey);
+            indexedCol.delete(valueKey);
+            return;
+        }
+        throw new IndexException("Column '" + colName + "' is Not indexed");
+    }
 }

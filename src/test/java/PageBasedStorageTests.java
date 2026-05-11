@@ -10,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -95,6 +96,7 @@ public class PageBasedStorageTests {
         assertInstanceOf(SelectQueryResult.class, result);
         SelectQueryResult selectQueryResult = (SelectQueryResult) result;
         assertEquals(5, selectQueryResult.getRowCount());
+        assertEquals("Alex" , selectQueryResult.getRow(0).getValue(1));
     }
     @Test
     void insertRowWithRecordIdAndFetch(){
@@ -108,11 +110,16 @@ public class PageBasedStorageTests {
         pageFileStorage.createTable(tableName, schema);
         Row row = new Row(List.of(1 ,"Rishi",true));
 //        Row row2 = new Row(List.of(2 ,"Alex",false));
-        RecordId recordId = pageFileStorage.insertRowWithRecordId(tableName,row);
+        RecordId recordId = pageFileStorage.insertRow(tableName,row);
 //        RecordId recordId2 = pageFileStorage.insertRowWithRecordId(tableName,row2);
-        Row persistedRow = pageFileStorage.getRowByRecordId(tableName,recordId);
-        assertEquals(row.getRow(),persistedRow.getRow());
-
+        Optional<Row> persistedRowOptional = pageFileStorage.getRowByRecordId(tableName,recordId);
+        if(persistedRowOptional.isPresent()){
+            Row persistedRow = persistedRowOptional.get();
+            assertEquals(row.getRow(),persistedRow.getRow());
+        }
+        else {
+            assertNull(persistedRowOptional.get());
+        }
     }
 
     //INDEX BASED TESTS
@@ -136,7 +143,11 @@ public class PageBasedStorageTests {
         List<RecordId> recordIds = index.get(value);
         List<Row> rows = new ArrayList<>();
         for(RecordId recordId : recordIds) {
-            rows.add(pageFileStorage.getRowByRecordId(tableName, recordId));
+            Optional<Row> rowOptional = pageFileStorage.getRowByRecordId(tableName,recordId);
+            if(rowOptional.isEmpty()){
+                continue;
+            }
+            rows.add(rowOptional.get());
         }
         assertEquals("Rishi", rows.get(0).getValue(1));
         assertEquals("Alex", rows.get(1).getValue(1));
@@ -206,25 +217,101 @@ public class PageBasedStorageTests {
 
     }
 
+//    @Test
+//    void deleteQueryOnIndexedTableShouldRebuildIndex() throws Exception {
+//        PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
+//        SpyIndexManager indexManager = new SpyIndexManager(pageFileStorage);
+//        QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
+//        SqlRunner runner = new SqlRunner(queryEngine);
+//        runner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
+//        runner.execute("Insert into students (id, name, active) values (1, \"Rishi\", true);");
+//        runner.execute("Insert into students (id, name, active) values (2, \"Sara\", false);");
+//        runner.execute("Insert into students (id, name, active) values (2, \"Alex\", true);");
+//
+//        indexManager.createIndex("students" , "id");
+//        runner.execute("Delete from students where id = 1;");
+//        QueryResult result = runner.execute("Select name from students where id = 2;");
+//        assertInstanceOf(SelectQueryResult.class, result);
+//        SelectQueryResult selectQueryResult = (SelectQueryResult) result;
+//        assertEquals(2,selectQueryResult.getRowCount());
+////        assertTrue(indexManager.rebuildCalled);
+//        assertTrue(indexManager.searchCalled);
+//    }
+
     @Test
-    void deleteQueryOnIndexedTableShouldRebuildIndex() throws Exception {
+    void deleteQueryShouldMarkSlotsAsDeleted() throws Exception {
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        SpyIndexManager indexManager = new SpyIndexManager(pageFileStorage);
+        IndexManager indexManager = new SpyIndexManager(pageFileStorage);
         QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
         SqlRunner runner = new SqlRunner(queryEngine);
+
         runner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
-        runner.execute("Insert into students (id, name, active) values (1, \"Rishi\", true);");
-        runner.execute("Insert into students (id, name, active) values (2, \"Sara\", false);");
-        runner.execute("Insert into students (id, name, active) values (2, \"Alex\", true);");
+        runner.execute("INSERT INTO students (id, name, active) VALUES (1, \"Rishi\", true);");
+        runner.execute("INSERT INTO students (id, name, active) VALUES (2, \"Sara\", false);");
+        runner.execute("INSERT INTO students (id, name, active) VALUES (2, \"Alex\", true);");
+
+        List<RowWithRecordId> originalList = pageFileStorage.scanRows("students");
+        RecordId deletedRid = originalList.getFirst().recordId();
+
+        runner.execute("DELETE FROM students WHERE id = 1;");
+
+        assertTrue(pageFileStorage.getRowByRecordId("students", deletedRid).isEmpty());
+
+        List<RowWithRecordId> afterDelete = pageFileStorage.scanRows("students");
+        assertEquals(2, afterDelete.size());
+
+        assertTrue(afterDelete.stream()
+                .noneMatch(rowRef -> rowRef.recordId().equals(deletedRid)));
+    }
+//tombstone is being persisted test. Had issues with storage reading from cache
+    @Test
+    void deleteAndSelectPersistenceTest() throws Exception {
+        PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
+        IndexManager indexManager = new SpyIndexManager(pageFileStorage);
+        QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
+        SqlRunner runner = new SqlRunner(queryEngine);
+
+        runner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
+        runner.execute("INSERT INTO students (id, name, active) VALUES (1, \"Rishi\", true);");
+        runner.execute("INSERT INTO students (id, name, active) VALUES (2, \"Sara\", false);");
+
+       RecordId deletedRecordId = pageFileStorage.scanRows("students").stream().findFirst().get().recordId();
+
+        runner.execute("DELETE FROM students WHERE id = 1;");
+
+        // new storage object, new page file object, new query engine.
+
+        PageFileStorage reloadedStorage = new PageFileStorage(tempDir);
+        IndexManager reloadedIndexManager = new SpyIndexManager(reloadedStorage);
+        QueryEngine reloadedEngine = new QueryEngine(reloadedStorage, reloadedIndexManager);
+        SqlRunner reloadedRunner = new SqlRunner(reloadedEngine);
+
+        QueryResult result = reloadedRunner.execute("SELECT name FROM students WHERE id = 1;");
+        SelectQueryResult select = (SelectQueryResult) result;
+
+        assertEquals(0, select.getRowCount());
+        assertTrue(reloadedStorage.getRowByRecordId("students", deletedRecordId).isEmpty());
+    }
+
+    @Test
+    void deleteQueryAlsoRemovesValueFromIndexMap(){
+        PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
+        IndexManager indexManager = new SpyIndexManager(pageFileStorage);
+        QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
+        SqlRunner runner = new SqlRunner(queryEngine);
+
+        runner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
+        runner.execute("INSERT INTO students (id, name, active) VALUES (1, \"Rishi\", true);");
+        runner.execute("INSERT INTO students (id, name, active) VALUES (2, \"Sara\", false);");
+        runner.execute("INSERT INTO students (id, name, active) VALUES (2, \"Alex\", true);");
 
         indexManager.createIndex("students" , "id");
-        runner.execute("Delete from students where id = 1;");
-        QueryResult result = runner.execute("Select name from students where id = 2;");
-        assertInstanceOf(SelectQueryResult.class, result);
-        SelectQueryResult selectQueryResult = (SelectQueryResult) result;
-        assertEquals(2,selectQueryResult.getRowCount());
-        assertTrue(indexManager.rebuildCalled);
-        assertTrue(indexManager.searchCalled);
+
+        Value valueToBeDeleted = new Value(Type.INT , 1);
+        runner.execute("DELETE FROM students WHERE id = 1;");
+        List<RecordId> list = indexManager.search("students", "id", valueToBeDeleted);
+        assertEquals(0, list.size());
+
     }
 
 

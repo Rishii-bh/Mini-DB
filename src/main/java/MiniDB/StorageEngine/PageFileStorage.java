@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class PageFileStorage  {
     private final String SCHEMA_FILE_NAME = "schema.meta";
@@ -111,6 +112,9 @@ public class PageFileStorage  {
                 Page page = pageFile.readPage(i);
                 int slotCount = page.getSlotCount();
                 for (int j = 0; j < slotCount; j++) {
+                    if(page.isDeletedSlot(j)){
+                        continue;
+                    }
                     byte[] rowBytes = page.getRowBytes(j);
                     Row row = rowSerializer.deserialize(rowBytes, schema);
                     rows.add(row);
@@ -178,43 +182,8 @@ public class PageFileStorage  {
              throw new StorageException("Could not replace Rows", e);
          }
     }
-    public RecordId insertRowWithRecordId(String table_name, Row row) {
-        Path tableDir = tableDir(table_name);
-        Path schemaFiles = schemaFile(table_name);
-        Path tablesFiles = tablesFile(table_name);
-        ensureTableDirExists(tableDir);
-        ensureSchemaFileExists(schemaFiles);
-        ensureTableFileExists(tablesFiles);
-        Schema schema = getSchema(table_name);
-        try {
-            PageFile pageFile = getPageFile(table_name);
-            int numOfPages = pageFile.getPageCount();
-            byte[] rowBytes = rowSerializer.serialize(row,schema);
-            for (int i = 0; i < numOfPages; i++) {
-                int slotId =-1;
-                Page page = pageFile.readPage(i);
-                slotId =page.tryInsert(rowBytes);
-                if(slotId != -1){
-                    pageFile.writePage(page, i);
-                    return new RecordId(i,slotId);
-                }
 
-            }
-            Page page = Page.createEmptyPage();
-            int slotId = page.tryInsert(rowBytes);
-            if(slotId == -1){
-                throw new StorageException("Row Size too big for a single page");
-            }
-            int pageNo = pageFile.appendPage(page);
-            return new RecordId(pageNo,slotId);
-
-
-        } catch (RuntimeException e) {
-            throw new StorageException("Could not insert Row", e);
-        }
-    }
-
-    public Row getRowByRecordId(String table_name, RecordId recordId) {
+    public Optional<Row> getRowByRecordId(String table_name, RecordId recordId) {
         if(recordId == null|| recordId.PageNo() < 0 || recordId.SlotId() < 0){
             throw new StorageException("RecordId is null or unspecified value");
         }
@@ -228,9 +197,12 @@ public class PageFileStorage  {
         try{
             PageFile pageFile = getPageFile(table_name);
             Page page = pageFile.readPage(recordId.PageNo());
-            byte[] rowBytes = page.getRowBytes(recordId.SlotId());
-            Row row = rowSerializer.deserialize(rowBytes,schema);
-            return row;
+            Optional<byte[]> rowBytesOptional = page.readLiveRowBytes(recordId.SlotId());
+            if(rowBytesOptional.isEmpty()){
+                return Optional.empty();
+            }
+            byte[] rowBytes = rowBytesOptional.get();
+            return Optional.of(rowSerializer.deserialize(rowBytes,schema));
 
         }catch (RuntimeException e){
             throw new StorageException("Could not get Row", e);
@@ -253,6 +225,9 @@ public class PageFileStorage  {
             for (int i = 0; i < pageCount; i++) {
                 Page page = pageFile.readPage(i);
                 for(int slotId = 0; slotId < page.getSlotCount(); slotId++){
+                    if(page.isDeletedSlot(slotId)){
+                        continue;
+                    }
                     byte[] rowBytes = page.getRowBytes(slotId);
                     Row row = rowSerializer.deserialize(rowBytes,schema);
                     rows.add(new RowWithRecordId(row,new RecordId(i,slotId)));
@@ -262,6 +237,27 @@ public class PageFileStorage  {
             throw new StorageException("Could not get Rows", e);
         }
         return rows;
+    }
+
+    public void markDelete(String table_name, List<RowWithRecordId> rows) {
+        Path tableDir = tableDir(table_name);
+        Path schemaFiles = schemaFile(table_name);
+        Path tablesFiles = tablesFile(table_name);
+        ensureTableDirExists(tableDir);
+        ensureSchemaFileExists(schemaFiles);
+        ensureTableFileExists(tablesFiles);
+
+        try{
+            PageFile pageFile = getPageFile(table_name);
+            for(RowWithRecordId row : rows){
+                int pageNo = row.recordId().PageNo();
+                Page page = pageFile.readPage(pageNo);
+                page.markSlotAsDeleted(row.recordId().SlotId());
+                pageFile.writePage(page,pageNo);
+            }
+        } catch (RuntimeException e) {
+            throw new StorageException("Coudn't delete Rows", e);
+        }
     }
 
 
