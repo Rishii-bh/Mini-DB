@@ -135,7 +135,28 @@ Current indexing behavior:
 - Indexes are in-memory only.
 - Indexes support equality conditions only.
 - Inserts update existing in-memory indexes.
-- Deletes rebuild affected in-memory indexes because the current delete path rewrites table data.
+
+---
+
+- ## Page-Local Deletion and Slot Reuse
+
+The storage layer now supports page-local deletion using stable `RecordId`s. A `RecordId` is represented as a `(pageId, slotId)` pair, so deleting a row no longer requires rewriting the entire table file or shifting other rows.
+
+Instead of physically removing rows immediately, deleted rows are marked as tombstoned inside the page slot directory. Query scans and direct record lookups ignore tombstoned slots, so deleted rows are no longer visible to the query layer.
+
+To avoid unbounded wasted space, pages can now reuse deleted slots during insertion. When a new row fits into the space previously occupied by a deleted row, the storage engine reuses that slot and returns the same `RecordId` for the newly inserted row. This keeps row locations stable while reducing unnecessary page growth.
+
+The page header also tracks the largest deleted slot length, allowing insert operations to quickly determine whether a page may contain a reusable deleted slot before scanning the slot directory.
+
+Index maintenance has been updated to work correctly with tombstone deletion and slot reuse. When rows are deleted, their `RecordId`s are removed from all relevant in-memory indexes before the slot is reused. This prevents stale index entries from pointing to newly inserted rows that occupy the same physical slot.
+
+Additional tests now cover:
+- tombstone-based deletion
+- direct lookup of deleted records
+- slot reuse after deletion
+- preventing reuse when the new row is too large
+- index correctness after delete and reuse
+- persistence of reused slots after reload
 
 ---
 
@@ -181,10 +202,8 @@ MiniDB is still a learning project and does not yet support:
 ## Next Steps
 
 Planned improvements:
-
-- Add page-local deletion instead of rewriting the whole table file
-- Add deleted-slot reuse and page compaction
 - Replace or extend in-memory indexes with persistent index structures
+- B+Trees Implementation
 - Add support for `UPDATE`
 - Add more SQL features gradually
 
@@ -196,7 +215,6 @@ Planned improvements:
 - Added in-memory indexing support for equality-based `WHERE` queries.
 - Added tests for page-based storage, direct `RecordId` lookup, indexed query execution, and index maintenance after inserts/deletes.
 
----
 
 ## Notes
 
