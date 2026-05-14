@@ -1,16 +1,17 @@
 package MiniDB.Console;
 
+import MiniDB.DatabaseRunner.DatabaseRunner;
 import MiniDB.query.QueryResult;
 import MiniDB.sql.SqlRunner;
 
 import java.util.Scanner;
 
 public class Repl {
-    private final SqlRunner sqlRunner;
+    private final DatabaseRunner dbRunner;
     private final ResultPrinter resultPrinter;
 
-    public Repl(SqlRunner sqlRunner, ResultPrinter resultPrinter) {
-        this.sqlRunner = sqlRunner;
+    public Repl(DatabaseRunner dbRunner, ResultPrinter resultPrinter) {
+        this.dbRunner = dbRunner;
         this.resultPrinter = resultPrinter;
     }
 
@@ -22,6 +23,7 @@ public class Repl {
             String input = scanner.nextLine();
 
             if (input.equalsIgnoreCase("exit")) {
+                dbRunner.shutdown();
                 break;
             }
 
@@ -30,7 +32,7 @@ public class Repl {
             }
 
             try {
-                QueryResult result = sqlRunner.execute(input);
+                QueryResult result = dbRunner.execute(input);
                 resultPrinter.print(result);
             } catch (RuntimeException e) {
                 System.out.println("Error: " + e.getMessage());

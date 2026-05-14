@@ -15,9 +15,11 @@ public class PageFileStorage  {
     private final String TABLE_FILE_NAME = "table.dat";
     private final BinaryRowSerializer rowSerializer;
     private final SchemaSerializer schemaSerializer;
+    private final SchemaManager schemaManager;
 
     private final Path rootDir;
-    public PageFileStorage(Path rootDir) {
+    public PageFileStorage(SchemaManager schemaManager, Path rootDir) {
+        this.schemaManager = schemaManager;
         if(rootDir == null) {
             throw new StorageException("Root directory not specified!");
         }
@@ -70,6 +72,7 @@ public class PageFileStorage  {
             String serializedSchema = schemaSerializer.serialize(schema);
             Files.writeString(schemaFiles, serializedSchema);
             Files.createFile(tablesFiles);
+            schemaManager.registerSchema(table_name, schema);
 
         } catch (IOException e) {
             throw new StorageException(e.getMessage());

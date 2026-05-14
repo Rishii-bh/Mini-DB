@@ -1,5 +1,6 @@
 package MiniDB.query;
 
+import MiniDB.Index.IndexManager;
 import MiniDB.StorageEngine.*;
 import MiniDB.core.*;
 import MiniDB.query.condition.Condition;
@@ -21,18 +22,20 @@ import java.util.Optional;
 public class QueryExecutor {
     private final PageFileStorage pageFileStorage;
     private final IndexManager indexManager;
+    private final SchemaManager schemaManager;
 
-    public QueryExecutor(PageFileStorage pageFileStorage,IndexManager indexManager) {
+    public QueryExecutor(PageFileStorage pageFileStorage, IndexManager indexManager, SchemaManager schemaManager) {
 
         this.pageFileStorage = pageFileStorage;
         this.indexManager = indexManager;
 
+        this.schemaManager = schemaManager;
     }
 
     public SelectQueryResult executeSelectQuery(ResolvedSelectQuery resolvedQuery) {
         //original table and original schema
         String tableName = resolvedQuery.getTableName();
-        Schema schema = pageFileStorage.getSchema(tableName);
+        Schema schema = schemaManager.getSchema(tableName);
         Optional<Condition> conditionOptional = resolvedQuery.getResolvedCondition();
         if (conditionOptional.isEmpty()) {
 
@@ -56,7 +59,7 @@ public class QueryExecutor {
             int index = schema.getColumnIndex(colInCondition);
             List<Row> resultRows = new ArrayList<>();
             if (condition.getOperator()== Operator.EQUALTO &&
-                    indexManager.hasIndexKey(tableName, colInCondition)) {
+                    indexManager.indexExists(tableName, colInCondition)) {
                 Type type = condition.getExpression1().getType();
                 Value value = ValueFactory.fromLiteral(condition.getValue() , type);
                 LinkedHashSet<RecordId> recordIds = indexManager.search(tableName, colInCondition, value);
@@ -100,14 +103,9 @@ public class QueryExecutor {
 
     public InsertQueryResult executeInsertQuery(ResolvedInsertQuery resolvedInsertQuery) {
         String tableName = resolvedInsertQuery.getTable();
-        RecordId recordId = pageFileStorage.insertRow(tableName,resolvedInsertQuery.getRow());
-        Schema schema = pageFileStorage.getSchema(tableName);
-        for(Column column : schema.getColumns()) {
-            String colName = column.getCol_name();
-            if(indexManager.hasIndexKey(tableName, colName)) {
-                indexManager.addValueToIndexWhenInserting(tableName,colName,resolvedInsertQuery.getRow(),recordId);
-                break;
-            }
+        RecordId recordId = pageFileStorage.insertRow(tableName, resolvedInsertQuery.getRow());
+        if (indexManager.tableHasIndex(resolvedInsertQuery.getTable())) {
+            indexManager.onInsert(tableName, resolvedInsertQuery.getRow(), recordId);
         }
         return new InsertQueryResult(1, "1 row inserted");
     }
@@ -135,10 +133,8 @@ public class QueryExecutor {
         }
         pageFileStorage.markDelete(tableName,deletedRows);
         if(indexManager.tableHasIndex(tableName)){
-            indexManager.deleteRecordIds(tableName,deletedRows);
+            indexManager.onDelete(tableName,deletedRows);
         }
-
-
         return new DeleteQueryResult(tableName, numOfRowsDeleted);
     }
 

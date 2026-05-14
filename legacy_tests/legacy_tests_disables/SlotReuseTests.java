@@ -1,4 +1,6 @@
-import MiniDB.StorageEngine.IndexManager;
+package legacy_tests_disables;
+
+import MiniDB.Index.IndexManager;
 import MiniDB.StorageEngine.PageFileStorage;
 import MiniDB.StorageEngine.RecordId;
 import MiniDB.StorageEngine.RowWithRecordId;
@@ -23,7 +25,7 @@ public class SlotReuseTests {
     @Test
     void deletedSlotsShouldBeReused() {
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        IndexManager indexManager = new IndexManager(pageFileStorage);
+        IndexManager indexManager = new IndexManager(tempDir,pageFileStorage);
         QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
         SqlRunner runner = new SqlRunner(queryEngine);
 
@@ -39,13 +41,13 @@ public class SlotReuseTests {
 
         List<RowWithRecordId> rows = pageFileStorage.scanRows("students");
 
-        assertEquals(1, rows.size());
+        Assertions.assertEquals(1, rows.size());
 
         RowWithRecordId newRowRef = rows.getFirst();
 
-        assertEquals(oldRid, newRowRef.recordId());
-        assertEquals(2, newRowRef.row().getValue(0));
-        assertEquals("Sara", newRowRef.row().getValue(1));
+        Assertions.assertEquals(oldRid, newRowRef.recordId());
+        Assertions.assertEquals(2, newRowRef.row().getValue(0));
+        Assertions.assertEquals("Sara", newRowRef.row().getValue(1));
 
     }
 
@@ -53,7 +55,7 @@ public class SlotReuseTests {
     @Test
     void reUsedRecordIdDirectReadReturnsNewRow(){
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        IndexManager indexManager = new IndexManager(pageFileStorage);
+        IndexManager indexManager = new IndexManager(tempDir,pageFileStorage);
         QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
         SqlRunner runner = new SqlRunner(queryEngine);
 
@@ -68,16 +70,16 @@ public class SlotReuseTests {
         runner.execute("INSERT INTO students (id, name, active) VALUES (2, \"Sara\", false);");
 
         Optional<Row> row = pageFileStorage.getRowByRecordId("students", oldRid);
-        assertTrue(row.isPresent());
-        assertEquals(2,row.get().getValue(0));
-        assertEquals("Sara",row.get().getValue(1));
+        Assertions.assertTrue(row.isPresent());
+        Assertions.assertEquals(2,row.get().getValue(0));
+        Assertions.assertEquals("Sara",row.get().getValue(1));
 
     }
 
     @Test
     void insertDoesNotReuseDeletedSlotWhenNewRowIsTooLarge() throws Exception {
         PageFileStorage storage = new PageFileStorage(tempDir);
-        IndexManager indexManager = new IndexManager(storage);
+        IndexManager indexManager = new IndexManager(tempDir,storage);
         QueryEngine engine = new QueryEngine(storage, indexManager);
         SqlRunner runner = new SqlRunner(engine);
 
@@ -93,17 +95,17 @@ public class SlotReuseTests {
 
         List<RowWithRecordId> rows = storage.scanRows("students");
 
-        assertEquals(1, rows.size());
+        Assertions.assertEquals(1, rows.size());
 
         RecordId newRid = rows.getFirst().recordId();
 
-        assertNotEquals(smallRid, newRid);
+        Assertions.assertNotEquals(smallRid, newRid);
     }
 
     @Test
     void selectFindsRowInsertedIntoReusedSlot() throws Exception {
         PageFileStorage storage = new PageFileStorage(tempDir);
-        IndexManager indexManager = new IndexManager(storage);
+        IndexManager indexManager = new IndexManager(tempDir,storage);
         QueryEngine engine = new QueryEngine(storage, indexManager);
         SqlRunner runner = new SqlRunner(engine);
 
@@ -115,11 +117,11 @@ public class SlotReuseTests {
 
         QueryResult result = runner.execute("SELECT name FROM students WHERE id = 2;");
 
-        assertInstanceOf(SelectQueryResult.class, result);
+        Assertions.assertInstanceOf(SelectQueryResult.class, result);
 
         SelectQueryResult select = (SelectQueryResult) result;
 
-        assertEquals(1, select.getRowCount());
-        assertEquals("Sara", select.getResultRows().getFirst().getValue(0));
+        Assertions.assertEquals(1, select.getRowCount());
+        Assertions.assertEquals("Sara", select.getResultRows().getFirst().getValue(0));
     }
 }

@@ -1,3 +1,6 @@
+package legacy_tests_disables;
+
+import MiniDB.Index.IndexManager;
 import MiniDB.StorageEngine.*;
 import MiniDB.query.QueryEngine;
 import MiniDB.query.QueryResult;
@@ -30,14 +33,14 @@ public class QueryFileStorageTest {
                 "SELECT id, name, active FROM students WHERE id = 1;"
         );
 
-        assertTrue(result instanceof SelectQueryResult);
+        Assertions.assertTrue(result instanceof SelectQueryResult);
 
         SelectQueryResult resultSet = (SelectQueryResult) result;
 
-        assertEquals(1, resultSet.getRowCount());
-        assertEquals(1, resultSet.getRow(0).getValue(0));
-        assertEquals("Rishi", resultSet.getRow(0).getValue(1));
-        assertEquals(true, resultSet.getRow(0).getValue(2));
+        Assertions.assertEquals(1, resultSet.getRowCount());
+        Assertions.assertEquals(1, resultSet.getRow(0).getValue(0));
+        Assertions.assertEquals("Rishi", resultSet.getRow(0).getValue(1));
+        Assertions.assertEquals(true, resultSet.getRow(0).getValue(2));
 
     }
 }

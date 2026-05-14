@@ -25,6 +25,10 @@ public class Schema {
     public Column getColumn(int index) {
         return columns.get(index);
     }
+    public Column getColumn(String colName) {
+        int index =getColumnIndex(colName);
+        return getColumn(index);
+    }
 
     public int size() {
         return this.columns.size();
@@ -36,6 +40,9 @@ public class Schema {
             throw new CoreLayerException("Column " + colName + " does not exist");
         }
         return colIndex;
+    }
+    public boolean hasColumn(String colName) {
+        return columnIndex.containsKey(colName);
     }
 
     public List<Column> getColumns() {

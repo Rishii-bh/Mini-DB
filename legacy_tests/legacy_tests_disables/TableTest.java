@@ -1,3 +1,5 @@
+package legacy_tests_disables;
+
 import MiniDB.core.*;
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +21,7 @@ public class TableTest {
 
         table.insert(new Row(List.of(1, "Rishi")));
 
-        assertEquals(1, table.getRowCount());
+        Assertions.assertEquals(1, table.getRowCount());
     }
 
     @Test
@@ -31,7 +33,7 @@ public class TableTest {
 
         Table table = new Table("students", schema);
 
-        assertThrows(RuntimeException.class, () -> {
+        Assertions.assertThrows(RuntimeException.class, () -> {
             table.insert(new Row(List.of(1)));
         });
     }

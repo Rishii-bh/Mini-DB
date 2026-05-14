@@ -2,6 +2,7 @@ package MiniDB.query.analyzer;
 
 import MiniDB.StorageEngine.BinaryFileStorage;
 import MiniDB.StorageEngine.PageFileStorage;
+import MiniDB.StorageEngine.SchemaManager;
 import MiniDB.StorageEngine.TextFileStorageEngine;
 import MiniDB.core.*;
 import MiniDB.query.rawqueries.InsertQuery;
@@ -13,9 +14,11 @@ import java.util.List;
 
 public class InsertAnalyzer {
     private final PageFileStorage pageFileStorage;
+    private final SchemaManager schemaManager;
 
-    public InsertAnalyzer(PageFileStorage binaryFileStorage) {
+    public InsertAnalyzer(PageFileStorage binaryFileStorage, SchemaManager schemaManager) {
         this.pageFileStorage = binaryFileStorage;
+        this.schemaManager = schemaManager;
     }
 
 
@@ -27,7 +30,7 @@ public class InsertAnalyzer {
         if(!pageFileStorage.tableExists(tableName)) {
            throw new RuntimeException("Table " + tableName + " does not exist");
        }
-        Schema schema = pageFileStorage.getSchema(tableName);
+        Schema schema = schemaManager.getSchema(tableName);
         if(query.getCol_names().size() != schema.size() ||
         query.getValues().size() != schema.size()) {
             throw new IllegalArgumentException("Inserted columns and values do not match Table Schema");

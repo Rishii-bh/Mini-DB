@@ -1,3 +1,6 @@
+package legacy_tests_disables;
+
+import MiniDB.Index.IndexManager;
 import MiniDB.StorageEngine.*;
 import MiniDB.core.Column;
 import MiniDB.core.Row;
@@ -8,11 +11,6 @@ import MiniDB.sql.SqlRunner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.DataInputStream;
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -70,12 +68,12 @@ public class BadQueryTests {
         ));
         List<Row> before = readBinaryRows(rowsPath, schema);
 
-        assertThrows(RuntimeException.class, () ->
+        Assertions.assertThrows(RuntimeException.class, () ->
                 runner.execute("INSERT INTO students (id, name, active) VALUES (\"wrong\", \"Sara\", false);")
         );
         List<Row> after = readBinaryRows(rowsPath, schema);
-        assertEquals(before.size(), after.size());
-        assertEquals(before.getFirst().getRow(), after.getFirst().getRow());
+        Assertions.assertEquals(before.size(), after.size());
+        Assertions.assertEquals(before.getFirst().getRow(), after.getFirst().getRow());
     }
     @Test
     void insertWithUnknownColumnThrowsAndDoesNotMutateRowsFile() throws Exception {
@@ -92,12 +90,12 @@ public class BadQueryTests {
         List<Row> before = readBinaryRows(rowsPath, schema);
 
 
-        assertThrows(RuntimeException.class, () ->
+        Assertions.assertThrows(RuntimeException.class, () ->
                 runner.execute("INSERT INTO students (id, age) VALUES (2, 20);")
         );
         List<Row> after = readBinaryRows(rowsPath, schema);
-        assertEquals(before.size(), after.size());
-        assertEquals(before.getFirst().getRow(), after.getFirst().getRow());
+        Assertions.assertEquals(before.size(), after.size());
+        Assertions.assertEquals(before.getFirst().getRow(), after.getFirst().getRow());
     }
 
     @Test
@@ -115,12 +113,12 @@ public class BadQueryTests {
         List<Row> before = readBinaryRows(rowsPath, schema);
 
 
-        assertThrows(RuntimeException.class, () ->
+        Assertions.assertThrows(RuntimeException.class, () ->
                 runner.execute("DELETE FROM students WHERE id = \"wrong\";")
         );
 
         List<Row> after = readBinaryRows(rowsPath, schema);
-        assertEquals(before.size(), after.size());
-        assertEquals(before.getFirst().getRow(), after.getFirst().getRow());
+        Assertions.assertEquals(before.size(), after.size());
+        Assertions.assertEquals(before.getFirst().getRow(), after.getFirst().getRow());
     }
 }

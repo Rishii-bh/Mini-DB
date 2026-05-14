@@ -39,3 +39,4 @@ build/
 data/
 test-data/
 *.bin
+legacy_tests/

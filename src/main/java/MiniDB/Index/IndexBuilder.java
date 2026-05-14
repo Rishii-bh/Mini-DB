@@ -1,5 +1,6 @@
-package MiniDB.StorageEngine;
+package MiniDB.Index;
 
+import MiniDB.StorageEngine.*;
 import MiniDB.core.Row;
 import MiniDB.core.Schema;
 import MiniDB.core.Type;
@@ -8,16 +9,18 @@ import MiniDB.core.Value;
 import java.util.*;
 
 public class IndexBuilder {
-    PageFileStorage storage;
-    public IndexBuilder(PageFileStorage storage) {
+    private final PageFileStorage storage;
+    private final SchemaManager schemaManager;
+    public IndexBuilder(PageFileStorage storage, SchemaManager schemaManager) {
        this.storage = storage;
+        this.schemaManager = schemaManager;
     }
 
     public InMemoryIndex build(String tableName, String columnName) {
         if(!storage.tableExists(tableName)) {
             throw new IndexException("Table " + tableName + " does not exist");
         }
-        Schema schema = storage.getSchema(tableName);
+        Schema schema = schemaManager.getSchema(tableName);
         int colIndex = schema.getColumnIndex(columnName);
         List<RowWithRecordId> rowsWithRecordIds = storage.scanRows(tableName);
         Map<Value , LinkedHashSet<RecordId>> index = new HashMap<>();

@@ -1,5 +1,6 @@
-package MiniDB.StorageEngine;
+package MiniDB.Index;
 
+import MiniDB.StorageEngine.RecordId;
 import MiniDB.core.Value;
 
 import java.util.*;

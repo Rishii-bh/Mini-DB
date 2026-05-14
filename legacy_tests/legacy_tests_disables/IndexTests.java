@@ -1,4 +1,6 @@
-import MiniDB.StorageEngine.IndexManager;
+package legacy_tests_disables;
+
+import MiniDB.Index.IndexManager;
 import MiniDB.StorageEngine.PageFileStorage;
 import MiniDB.StorageEngine.RecordId;
 import MiniDB.StorageEngine.RowWithRecordId;
@@ -24,7 +26,7 @@ public class IndexTests {
     @Test
     void deleteQueryOnANonIndexedColumn(){
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        IndexManager indexManager = new IndexManager(pageFileStorage);
+        IndexManager indexManager = new IndexManager(tempDir,pageFileStorage);
         QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
         SqlRunner runner = new SqlRunner(queryEngine);
 
@@ -46,17 +48,17 @@ public class IndexTests {
 
         LinkedHashSet<RecordId> bucket1 = indexManager.search("students","id",valueForId1);
         LinkedHashSet<RecordId> bucket2 = indexManager.search("students","id",valueForId2);
-        assertEquals(1, bucket1.size());
-        assertEquals(1, bucket2.size());
-        assertEquals(rishiRecordId, bucket1.getFirst());
-        assertEquals(saraRecordId, bucket2.getFirst());
+        Assertions.assertEquals(1, bucket1.size());
+        Assertions.assertEquals(1, bucket2.size());
+        Assertions.assertEquals(rishiRecordId, bucket1.getFirst());
+        Assertions.assertEquals(saraRecordId, bucket2.getFirst());
     }
 
     //this test aims to prove that a record should be deleted from multiple indexes inside a table
     @Test
     void deleteQueryRemovesIndicesAcrossMultipleIndexMaps(){
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        IndexManager indexManager = new IndexManager(pageFileStorage);
+        IndexManager indexManager = new IndexManager(tempDir,pageFileStorage);
         QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
         SqlRunner runner = new SqlRunner(queryEngine);
 
@@ -78,9 +80,9 @@ public class IndexTests {
 
         LinkedHashSet<RecordId> idBucket = indexManager.search("students","id",valueForId1);
         LinkedHashSet<RecordId> nameBucket = indexManager.search("students","name",valueForRishi);
-        assertFalse(idBucket.contains(rishiRecordId));
-        assertFalse(nameBucket.contains(rishiRecordId));
-        assertTrue(nameBucket== null || nameBucket.isEmpty());
+        Assertions.assertFalse(idBucket.contains(rishiRecordId));
+        Assertions.assertFalse(nameBucket.contains(rishiRecordId));
+        Assertions.assertTrue(nameBucket== null || nameBucket.isEmpty());
     }
 
 

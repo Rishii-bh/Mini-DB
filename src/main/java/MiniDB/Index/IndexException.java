@@ -1,4 +1,4 @@
-package MiniDB.StorageEngine;
+package MiniDB.Index;
 
 public class IndexException extends RuntimeException {
     public IndexException(String message) {

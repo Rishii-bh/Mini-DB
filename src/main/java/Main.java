@@ -1,21 +1,22 @@
 import MiniDB.Console.Repl;
 import MiniDB.Console.ResultPrinter;
+import MiniDB.DatabaseRunner.DatabaseRunner;
+import MiniDB.Index.IndexManager;
 import MiniDB.StorageEngine.*;
 import MiniDB.query.QueryEngine;
+import MiniDB.query.QueryResult;
 import MiniDB.sql.SqlRunner;
 
 import java.nio.file.Path;
 
 public class Main {
     public static void main(String[] args) {
-        PageFileStorage storageEngine = new PageFileStorage(Path.of("data"));
-        IndexManager indexManager = new IndexManager(storageEngine);
-
-        QueryEngine queryEngine = new QueryEngine(storageEngine , indexManager);
-        SqlRunner sqlRunner = new SqlRunner(queryEngine);
+        Path root = Path.of("data");
+        DatabaseRunner dbRunner = new DatabaseRunner(root);
+        dbRunner.start();
+        Runtime.getRuntime().addShutdownHook(new Thread(dbRunner::shutdown));
         ResultPrinter resultPrinter = new ResultPrinter();
-
-        Repl repl = new Repl(sqlRunner, resultPrinter);
+        Repl repl = new Repl(dbRunner, resultPrinter);
         repl.start();
     }
 }

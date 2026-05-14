@@ -1,3 +1,5 @@
+package legacy_tests_disables;
+
 import MiniDB.StorageEngine.Page;
 import org.junit.jupiter.api.Test;
 
@@ -11,9 +13,9 @@ public class PageTests {
         byte[] row = {1,2,3,4};
         int slotId= page.tryInsert(row);
 
-        assertEquals(0,slotId);
-        assertEquals(1,page.getSlotCount());
-        assertArrayEquals(row,page.getRowBytes(slotId));
+        Assertions.assertEquals(0,slotId);
+        Assertions.assertEquals(1,page.getSlotCount());
+        Assertions.assertArrayEquals(row,page.getRowBytes(slotId));
     }
 
     @Test
@@ -24,9 +26,9 @@ public class PageTests {
         byte[] persistedData = page.getData();
         Page persistedPage = Page.wrap(persistedData);
 
-        assertEquals(1,persistedPage.getSlotCount());
-        assertArrayEquals(page.getRowBytes(slotId), persistedPage.getRowBytes(slotId));
-        assertEquals(persistedPage.getFreeSpaceEnd(),page.getFreeSpaceEnd());
+        Assertions.assertEquals(1,persistedPage.getSlotCount());
+        Assertions.assertArrayEquals(page.getRowBytes(slotId), persistedPage.getRowBytes(slotId));
+        Assertions.assertEquals(persistedPage.getFreeSpaceEnd(),page.getFreeSpaceEnd());
     }
 
 

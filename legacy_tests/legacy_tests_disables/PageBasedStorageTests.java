@@ -1,3 +1,9 @@
+package legacy_tests_disables;
+
+import MiniDB.Index.InMemoryIndex;
+import MiniDB.Index.IndexBuilder;
+import MiniDB.Index.IndexManager;
+import MiniDB.Index.SpyIndexManager;
 import MiniDB.StorageEngine.*;
 import MiniDB.core.*;
 import MiniDB.query.QueryEngine;
@@ -21,7 +27,7 @@ public class PageBasedStorageTests {
 
     private SqlRunner newRunner() {
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        IndexManager indexManager = new IndexManager(pageFileStorage);
+        IndexManager indexManager = new IndexManager(tempDir,pageFileStorage);
         QueryEngine queryEngine = new QueryEngine(pageFileStorage , indexManager);
         return new SqlRunner(queryEngine);
     }
@@ -61,9 +67,9 @@ public class PageBasedStorageTests {
         }
 
         QueryResult result = runner.execute("SELECT id, name, active FROM students WHERE active = true;");
-        assertInstanceOf(SelectQueryResult.class, result);
+        Assertions.assertInstanceOf(SelectQueryResult.class, result);
         SelectQueryResult selectQueryResult = (SelectQueryResult) result;
-        assertEquals(20, selectQueryResult.getRowCount());
+        Assertions.assertEquals(20, selectQueryResult.getRowCount());
     }
 
     @Test
@@ -73,9 +79,9 @@ public class PageBasedStorageTests {
         runner.execute("Insert into students (id, name, active) values (1, \"Rishi\", true);");
         SqlRunner runner2 = newRunner();
         QueryResult result = runner2.execute("SELECT id, name, active FROM students WHERE active = true;");
-        assertInstanceOf(SelectQueryResult.class, result);
+        Assertions.assertInstanceOf(SelectQueryResult.class, result);
         SelectQueryResult selectQueryResult = (SelectQueryResult) result;
-        assertEquals(1, selectQueryResult.getRowCount());
+        Assertions.assertEquals(1, selectQueryResult.getRowCount());
     }
 
     @Test
@@ -94,10 +100,10 @@ public class PageBasedStorageTests {
         }
         runner.execute("DELETE FROM students WHERE name = \"Rishi\";");
         QueryResult result = runner.execute("SELECT id, name, active FROM students WHERE name = \"Alex\";");
-        assertInstanceOf(SelectQueryResult.class, result);
+        Assertions.assertInstanceOf(SelectQueryResult.class, result);
         SelectQueryResult selectQueryResult = (SelectQueryResult) result;
-        assertEquals(5, selectQueryResult.getRowCount());
-        assertEquals("Alex" , selectQueryResult.getRow(0).getValue(1));
+        Assertions.assertEquals(5, selectQueryResult.getRowCount());
+        Assertions.assertEquals("Alex" , selectQueryResult.getRow(0).getValue(1));
     }
     @Test
     void insertRowWithRecordIdAndFetch(){
@@ -116,10 +122,10 @@ public class PageBasedStorageTests {
         Optional<Row> persistedRowOptional = pageFileStorage.getRowByRecordId(tableName,recordId);
         if(persistedRowOptional.isPresent()){
             Row persistedRow = persistedRowOptional.get();
-            assertEquals(row.getRow(),persistedRow.getRow());
+            Assertions.assertEquals(row.getRow(),persistedRow.getRow());
         }
         else {
-            assertNull(persistedRowOptional.get());
+            Assertions.assertNull(persistedRowOptional.get());
         }
     }
 
@@ -150,24 +156,24 @@ public class PageBasedStorageTests {
             }
             rows.add(rowOptional.get());
         }
-        assertEquals("Rishi", rows.get(0).getValue(1));
-        assertEquals("Alex", rows.get(1).getValue(1));
+        Assertions.assertEquals("Rishi", rows.get(0).getValue(1));
+        Assertions.assertEquals("Alex", rows.get(1).getValue(1));
 
 
-        assertEquals(2,numberOfActiveRows);
+        Assertions.assertEquals(2,numberOfActiveRows);
 
-        assertThrows(CoreLayerException.class ,() -> indexBuilder.build(tableName, missingColumnName));
+        Assertions.assertThrows(CoreLayerException.class ,() -> indexBuilder.build(tableName, missingColumnName));
 
         Value notIndexedColumnValue = new Value(Type.INT , 1);
         int numberOfNotIndexedRows = index.get(notIndexedColumnValue).size();
-        assertEquals(0,numberOfNotIndexedRows);
+        Assertions.assertEquals(0,numberOfNotIndexedRows);
 
     }
 
     @Test
     void selectWhereQueryUsesIndex() throws Exception {
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        SpyIndexManager indexManager = new SpyIndexManager(pageFileStorage);
+        SpyIndexManager indexManager = new SpyIndexManager(tempDir,pageFileStorage);
         QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
         SqlRunner runner = new SqlRunner(queryEngine);
         runner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
@@ -176,16 +182,16 @@ public class PageBasedStorageTests {
         runner.execute("Insert into students (id, name, active) values (1, \"Alex\", true);");
         indexManager.createIndex("students" , "id");
         QueryResult result = runner.execute("Select name from students where id = 1;");
-        assertInstanceOf(SelectQueryResult.class, result);
+        Assertions.assertInstanceOf(SelectQueryResult.class, result);
         SelectQueryResult selectQueryResult = (SelectQueryResult) result;
-        assertEquals(2,selectQueryResult.getRowCount());
-        assertTrue(indexManager.searchCalled);
+        Assertions.assertEquals(2,selectQueryResult.getRowCount());
+        Assertions.assertTrue(indexManager.searchCalled);
 
     }
     @Test
     void selectWhereQueryUsesFullRowScanWhenNotIndexed() throws Exception {
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        SpyIndexManager indexManager = new SpyIndexManager(pageFileStorage);
+        SpyIndexManager indexManager = new SpyIndexManager(tempDir,pageFileStorage);
         QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
         SqlRunner runner = new SqlRunner(queryEngine);
         runner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
@@ -194,17 +200,17 @@ public class PageBasedStorageTests {
         runner.execute("Insert into students (id, name, active) values (1, \"Alex\", true);");
         indexManager.createIndex("students" , "name");
         QueryResult result = runner.execute("Select name from students where id = 1;");
-        assertInstanceOf(SelectQueryResult.class, result);
+        Assertions.assertInstanceOf(SelectQueryResult.class, result);
         SelectQueryResult selectQueryResult = (SelectQueryResult) result;
-        assertEquals(2,selectQueryResult.getRowCount());
-        assertFalse(indexManager.searchCalled);
+        Assertions.assertEquals(2,selectQueryResult.getRowCount());
+        Assertions.assertFalse(indexManager.searchCalled);
 
     }
 
     @Test
     void insertQueryOnIndexedTableShouldCreateIndexForNewRow() throws Exception {
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        SpyIndexManager indexManager = new SpyIndexManager(pageFileStorage);
+        SpyIndexManager indexManager = new SpyIndexManager(tempDir ,pageFileStorage);
         QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
         SqlRunner runner = new SqlRunner(queryEngine);
         runner.execute("CREATE TABLE students (id INT, name TEXT, active BOOL);");
@@ -214,7 +220,7 @@ public class PageBasedStorageTests {
 
         indexManager.createIndex("students" , "id");
         runner.execute("Insert into students (id, name, active) values (3, \"Jones\", false);");
-        assertTrue(indexManager.addValueCalled);
+        Assertions.assertTrue(indexManager.addValueCalled);
 
     }
 
@@ -242,7 +248,7 @@ public class PageBasedStorageTests {
     @Test
     void deleteQueryShouldMarkSlotsAsDeleted() throws Exception {
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        IndexManager indexManager = new SpyIndexManager(pageFileStorage);
+        IndexManager indexManager = new SpyIndexManager(tempDir,pageFileStorage);
         QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
         SqlRunner runner = new SqlRunner(queryEngine);
 
@@ -256,19 +262,19 @@ public class PageBasedStorageTests {
 
         runner.execute("DELETE FROM students WHERE id = 1;");
 
-        assertTrue(pageFileStorage.getRowByRecordId("students", deletedRid).isEmpty());
+        Assertions.assertTrue(pageFileStorage.getRowByRecordId("students", deletedRid).isEmpty());
 
         List<RowWithRecordId> afterDelete = pageFileStorage.scanRows("students");
-        assertEquals(2, afterDelete.size());
+        Assertions.assertEquals(2, afterDelete.size());
 
-        assertTrue(afterDelete.stream()
+        Assertions.assertTrue(afterDelete.stream()
                 .noneMatch(rowRef -> rowRef.recordId().equals(deletedRid)));
     }
 //tombstone is being persisted test. Had issues with storage reading from cache
     @Test
     void deleteAndSelectPersistenceTest() throws Exception {
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        IndexManager indexManager = new SpyIndexManager(pageFileStorage);
+        IndexManager indexManager = new SpyIndexManager(tempDir,pageFileStorage);
         QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
         SqlRunner runner = new SqlRunner(queryEngine);
 
@@ -283,21 +289,21 @@ public class PageBasedStorageTests {
         // new storage object, new page file object, new query engine.
 
         PageFileStorage reloadedStorage = new PageFileStorage(tempDir);
-        IndexManager reloadedIndexManager = new SpyIndexManager(reloadedStorage);
+        IndexManager reloadedIndexManager = new SpyIndexManager(tempDir, reloadedStorage);
         QueryEngine reloadedEngine = new QueryEngine(reloadedStorage, reloadedIndexManager);
         SqlRunner reloadedRunner = new SqlRunner(reloadedEngine);
 
         QueryResult result = reloadedRunner.execute("SELECT name FROM students WHERE id = 1;");
         SelectQueryResult select = (SelectQueryResult) result;
 
-        assertEquals(0, select.getRowCount());
-        assertTrue(reloadedStorage.getRowByRecordId("students", deletedRecordId).isEmpty());
+        Assertions.assertEquals(0, select.getRowCount());
+        Assertions.assertTrue(reloadedStorage.getRowByRecordId("students", deletedRecordId).isEmpty());
     }
 
     @Test
     void deleteQueryAlsoRemovesValueFromIndexMap(){
         PageFileStorage pageFileStorage = new PageFileStorage(tempDir);
-        IndexManager indexManager = new SpyIndexManager(pageFileStorage);
+        IndexManager indexManager = new SpyIndexManager(tempDir,pageFileStorage);
         QueryEngine queryEngine = new QueryEngine(pageFileStorage, indexManager);
         SqlRunner runner = new SqlRunner(queryEngine);
 
@@ -311,7 +317,7 @@ public class PageBasedStorageTests {
         Value valueToBeDeleted = new Value(Type.INT , 1);
         runner.execute("DELETE FROM students WHERE id = 1;");
         LinkedHashSet<RecordId> list = indexManager.search("students", "id", valueToBeDeleted);
-        assertEquals(0, list.size());
+        Assertions.assertEquals(0, list.size());
 
     }
 

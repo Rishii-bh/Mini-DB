@@ -2,6 +2,7 @@ package MiniDB.query.analyzer;
 
 import MiniDB.StorageEngine.BinaryFileStorage;
 import MiniDB.StorageEngine.PageFileStorage;
+import MiniDB.StorageEngine.SchemaManager;
 import MiniDB.StorageEngine.TextFileStorageEngine;
 import MiniDB.core.Column;
 import MiniDB.core.Schema;
@@ -16,10 +17,12 @@ import java.util.Optional;
 
 public class SelectAnalyzer {
     private final PageFileStorage pageFileStorage;
+    private final SchemaManager schemaManager;
 
-    public SelectAnalyzer(PageFileStorage binaryFileStorage) {
+    public SelectAnalyzer(PageFileStorage binaryFileStorage, SchemaManager schemaManager) {
         this.pageFileStorage = binaryFileStorage;
 
+        this.schemaManager = schemaManager;
     }
 
     public ResolvedSelectQuery resolve(SelectQuery query) {
@@ -30,7 +33,7 @@ public class SelectAnalyzer {
         if(!pageFileStorage.tableExists(tableName)) {
             throw new RuntimeException("Table " + query.getTableName() + " does not exist");
         }
-        Schema tableSchema = pageFileStorage.getSchema(tableName);
+        Schema tableSchema = schemaManager.getSchema(tableName);
         List<Column> resultColumns = new ArrayList<Column>();
 
         List<Integer> selectedColIndex = new ArrayList<>();
